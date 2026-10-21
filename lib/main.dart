@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'services/storage_service.dart';
 import 'services/ai_service.dart';
 import 'services/auth_service.dart';
@@ -15,10 +16,8 @@ import 'screens/splash_screen.dart';
 import 'screens/add_transaction_modal.dart';
 import 'screens/ai_assistant_sheet.dart';
 
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  await initializeDateFormatting('en_US', null);
-  await initializeDateFormatting('id_ID', null);
 
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -29,33 +28,23 @@ void main() async {
     ),
   );
 
-  final storageService = await StorageService.init();
-  final aiService = await AiService.init();
-  final authService = await AuthService.init();
-  final localeService = await LocaleService.init();
-
-  runApp(IriTotApp(
-    storageService: storageService,
-    aiService: aiService,
-    authService: authService,
-    localeService: localeService,
-  ));
+  runApp(const IriTotApp());
 }
 
 class IriTotApp extends StatefulWidget {
-  final StorageService storageService;
-  final AiService aiService;
-  final AuthService authService;
-  final LocaleService localeService;
+  final StorageService? storageService;
+  final AiService? aiService;
+  final AuthService? authService;
+  final LocaleService? localeService;
   final bool enableSplash;
   final Duration splashDuration;
 
   const IriTotApp({
     super.key,
-    required this.storageService,
-    required this.aiService,
-    required this.authService,
-    required this.localeService,
+    this.storageService,
+    this.aiService,
+    this.authService,
+    this.localeService,
     this.enableSplash = true,
     this.splashDuration = const Duration(milliseconds: 1800),
   });
@@ -66,22 +55,90 @@ class IriTotApp extends StatefulWidget {
 
 class _IriTotAppState extends State<IriTotApp> with WidgetsBindingObserver {
   late bool _showSplash;
-  late bool _isLoggedIn;
+  bool _isLoggedIn = false;
   String? _sessionTimeoutMessage;
+  String? _initErrorMessage;
+
+  StorageService? _storageService;
+  AiService? _aiService;
+  AuthService? _authService;
+  late LocaleService _localeService;
+  bool _isInitialized = false;
+  bool _splashDurationFinished = false;
 
   @override
   void initState() {
     super.initState();
     _showSplash = widget.enableSplash;
+    _localeService = widget.localeService ?? LocaleService();
     WidgetsBinding.instance.addObserver(this);
-    if (widget.authService.isSessionExpired()) {
-      widget.authService.lockSessionDueToTimeout();
-      _isLoggedIn = false;
-      _sessionTimeoutMessage = widget.localeService.t('sessionTimeoutMsg');
+
+    if (widget.storageService != null &&
+        widget.aiService != null &&
+        widget.authService != null &&
+        widget.localeService != null) {
+      _storageService = widget.storageService;
+      _aiService = widget.aiService;
+      _authService = widget.authService;
+      _isInitialized = true;
+      _evaluateInitialAuthSession();
     } else {
-      _isLoggedIn = widget.authService.isLoggedIn();
+      _bootstrapServicesAsync();
+    }
+  }
+
+  void _evaluateInitialAuthSession() {
+    final auth = _authService;
+    if (auth == null) return;
+
+    if (auth.isSessionExpired()) {
+      auth.lockSessionDueToTimeout();
+      _isLoggedIn = false;
+      _sessionTimeoutMessage = _localeService.t('sessionTimeoutMsg');
+    } else {
+      _isLoggedIn = auth.isLoggedIn();
       if (_isLoggedIn) {
-        widget.authService.updateLastActiveTimestamp();
+        auth.updateLastActiveTimestamp();
+      }
+    }
+  }
+
+  Future<void> _bootstrapServicesAsync() async {
+    try {
+      try {
+        await Future.wait([
+          initializeDateFormatting('en_US', null),
+          initializeDateFormatting('id_ID', null),
+        ]);
+      } catch (e) {
+        debugPrint('Locale date formatting warning: $e');
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      final storage = await StorageService.init(prefs);
+      final ai = await AiService.init(prefs);
+      final auth = await AuthService.init(prefs);
+      _localeService.updatePrefs(prefs);
+
+      if (mounted) {
+        setState(() {
+          _storageService = storage;
+          _aiService = ai;
+          _authService = auth;
+          _isInitialized = true;
+          _evaluateInitialAuthSession();
+
+          if (_splashDurationFinished && _showSplash) {
+            _showSplash = false;
+          }
+        });
+      }
+    } catch (e, stack) {
+      debugPrint('Fatal error initializing IriTot: $e\n$stack');
+      if (mounted) {
+        setState(() {
+          _initErrorMessage = e.toString();
+        });
       }
     }
   }
@@ -94,23 +151,22 @@ class _IriTotAppState extends State<IriTotApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (!_isLoggedIn) return;
+    final auth = _authService;
+    if (auth == null || !_isLoggedIn) return;
 
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive ||
         state == AppLifecycleState.hidden) {
-      // User minimized the app or switched away
-      widget.authService.updateLastActiveTimestamp();
+      auth.updateLastActiveTimestamp();
     } else if (state == AppLifecycleState.resumed) {
-      // User came back to the app
-      if (widget.authService.isSessionExpired()) {
-        widget.authService.lockSessionDueToTimeout();
+      if (auth.isSessionExpired()) {
+        auth.lockSessionDueToTimeout();
         setState(() {
           _isLoggedIn = false;
-          _sessionTimeoutMessage = widget.localeService.t('sessionTimeoutMsg');
+          _sessionTimeoutMessage = _localeService.t('sessionTimeoutMsg');
         });
       } else {
-        widget.authService.updateLastActiveTimestamp();
+        auth.updateLastActiveTimestamp();
       }
     }
   }
@@ -123,7 +179,7 @@ class _IriTotAppState extends State<IriTotApp> with WidgetsBindingObserver {
   }
 
   void _handleLogout() async {
-    await widget.authService.logout();
+    await _authService?.logout();
     setState(() {
       _isLoggedIn = false;
       _sessionTimeoutMessage = null;
@@ -133,38 +189,99 @@ class _IriTotAppState extends State<IriTotApp> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: widget.localeService,
+      listenable: _localeService,
       builder: (context, _) {
         return MaterialApp(
           title: 'IRITOT',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.darkTheme,
-          home: _showSplash
-              ? SplashScreen(
-                  localeService: widget.localeService,
-                  duration: widget.splashDuration,
-                  onFinish: () {
-                    setState(() {
-                      _showSplash = false;
-                    });
-                  },
-                )
-              : (_isLoggedIn
-                  ? MainNavigationScaffold(
-                      storageService: widget.storageService,
-                      aiService: widget.aiService,
-                      authService: widget.authService,
-                      localeService: widget.localeService,
-                      onLogout: _handleLogout,
-                    )
-                  : LoginScreen(
-                      authService: widget.authService,
-                      localeService: widget.localeService,
-                      initialErrorMessage: _sessionTimeoutMessage,
-                      onLoginSuccess: _handleLoginSuccess,
-                    )),
+          home: _buildHomeWidget(),
         );
       },
+    );
+  }
+
+  Widget _buildHomeWidget() {
+    if (_initErrorMessage != null) {
+      return Scaffold(
+        backgroundColor: AppTheme.bgDark,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline_rounded, color: AppTheme.coralRose, size: 48),
+                const SizedBox(height: 16),
+                const Text(
+                  'Initialization Notice',
+                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _initErrorMessage!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      _initErrorMessage = null;
+                    });
+                    _bootstrapServicesAsync();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.emeraldGreen,
+                    foregroundColor: Colors.black,
+                  ),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_showSplash) {
+      return SplashScreen(
+        localeService: _localeService,
+        duration: widget.splashDuration,
+        onFinish: () {
+          _splashDurationFinished = true;
+          if (_isInitialized) {
+            setState(() {
+              _showSplash = false;
+            });
+          }
+        },
+      );
+    }
+
+    if (!_isInitialized || _storageService == null || _aiService == null || _authService == null) {
+      return SplashScreen(
+        localeService: _localeService,
+        duration: const Duration(milliseconds: 300),
+        onFinish: () {},
+      );
+    }
+
+    if (_isLoggedIn) {
+      return MainNavigationScaffold(
+        storageService: _storageService!,
+        aiService: _aiService!,
+        authService: _authService!,
+        localeService: _localeService,
+        onLogout: _handleLogout,
+      );
+    }
+
+    return LoginScreen(
+      authService: _authService!,
+      localeService: _localeService,
+      initialErrorMessage: _sessionTimeoutMessage,
+      onLoginSuccess: _handleLoginSuccess,
     );
   }
 }

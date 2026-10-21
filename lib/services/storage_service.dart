@@ -22,8 +22,8 @@ class StorageService {
 
   StorageService(this._prefs);
 
-  static Future<StorageService> init() async {
-    final prefs = await SharedPreferences.getInstance();
+  static Future<StorageService> init([SharedPreferences? existingPrefs]) async {
+    final prefs = existingPrefs ?? await SharedPreferences.getInstance();
     final service = StorageService(prefs);
     await service._seedInitialDataIfNeeded();
     await service._seedSavingsIfNeeded();

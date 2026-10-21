@@ -17,8 +17,8 @@ class AuthService {
 
   AuthService(this._prefs);
 
-  static Future<AuthService> init() async {
-    final prefs = await SharedPreferences.getInstance();
+  static Future<AuthService> init([SharedPreferences? existingPrefs]) async {
+    final prefs = existingPrefs ?? await SharedPreferences.getInstance();
     final service = AuthService(prefs);
     await service._initDefaultCredentialsIfNeeded();
     return service;

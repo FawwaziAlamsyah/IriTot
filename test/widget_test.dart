@@ -218,4 +218,26 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
     expect(finished, true);
   });
+
+  testWidgets('IriTotApp default constructor bootstraps services automatically without freeze', (WidgetTester tester) async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    SharedPreferences.setMockInitialValues({});
+
+    await tester.pumpWidget(
+      const IriTotApp(
+        splashDuration: Duration(milliseconds: 300),
+      ),
+    );
+
+    // Initial frame renders splash screen immediately
+    await tester.pump();
+    expect(find.text('IRITOT'), findsOneWidget);
+
+    // Advance time to allow bootstrap and splash duration to complete
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pumpAndSettle();
+
+    // Verify smooth transition to LoginScreen
+    expect(find.text('Sign In to Your Account'), findsOneWidget);
+  });
 }

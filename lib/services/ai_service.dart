@@ -15,8 +15,8 @@ class AiService {
 
   AiService(this._prefs);
 
-  static Future<AiService> init() async {
-    final prefs = await SharedPreferences.getInstance();
+  static Future<AiService> init([SharedPreferences? existingPrefs]) async {
+    final prefs = existingPrefs ?? await SharedPreferences.getInstance();
     return AiService(prefs);
   }
 

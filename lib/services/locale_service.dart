@@ -5,15 +5,15 @@ class LocaleService extends ChangeNotifier {
   static const String _keyLocale = 'iritot_app_language';
   static const String defaultLocale = 'en';
 
-  final SharedPreferences _prefs;
+  SharedPreferences? _prefs;
   late String _currentLocale;
 
-  LocaleService(this._prefs) {
-    _currentLocale = _prefs.getString(_keyLocale) ?? defaultLocale;
+  LocaleService([this._prefs]) {
+    _currentLocale = _prefs?.getString(_keyLocale) ?? defaultLocale;
   }
 
-  static Future<LocaleService> init() async {
-    final prefs = await SharedPreferences.getInstance();
+  static Future<LocaleService> init([SharedPreferences? existingPrefs]) async {
+    final prefs = existingPrefs ?? await SharedPreferences.getInstance();
     return LocaleService(prefs);
   }
 
@@ -21,10 +21,19 @@ class LocaleService extends ChangeNotifier {
   bool get isEnglish => _currentLocale == 'en';
   bool get isIndonesian => _currentLocale == 'id';
 
+  void updatePrefs(SharedPreferences prefs) {
+    _prefs = prefs;
+    final savedLocale = prefs.getString(_keyLocale);
+    if (savedLocale != null && savedLocale != _currentLocale) {
+      _currentLocale = savedLocale;
+      notifyListeners();
+    }
+  }
+
   Future<void> setLocale(String langCode) async {
     if (_currentLocale != langCode) {
       _currentLocale = langCode;
-      await _prefs.setString(_keyLocale, langCode);
+      await _prefs?.setString(_keyLocale, langCode);
       notifyListeners();
     }
   }
