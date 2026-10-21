@@ -3,11 +3,14 @@ import 'package:intl/intl.dart';
 import '../models/transaction_item.dart';
 import '../models/category.dart';
 import '../models/budget.dart';
+import '../models/wallet.dart';
+import '../models/savings_pocket.dart';
 import '../services/storage_service.dart';
 import '../services/ai_service.dart';
 import '../theme/app_theme.dart';
 import 'add_transaction_modal.dart';
 import 'budget_screen.dart';
+import 'savings_screen.dart';
 import '../services/locale_service.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -18,6 +21,8 @@ class HomeScreen extends StatefulWidget {
   final Function(int) onNavigateToTab;
   final VoidCallback onOpenAiAssistant;
 
+  final int initialTabIndex;
+
   const HomeScreen({
     super.key,
     required this.storageService,
@@ -26,14 +31,41 @@ class HomeScreen extends StatefulWidget {
     required this.onDataChanged,
     required this.onNavigateToTab,
     required this.onOpenAiAssistant,
+    this.initialTabIndex = 0,
   });
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
   bool _isBalanceHidden = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: widget.initialTabIndex,
+    );
+  }
+
+  @override
+  void didUpdateWidget(HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialTabIndex != widget.initialTabIndex &&
+        _tabController.index != widget.initialTabIndex) {
+      _tabController.animateTo(widget.initialTabIndex);
+    }
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
 
   final NumberFormat _currencyFormat = NumberFormat.currency(
     locale: 'id_ID',
@@ -141,51 +173,90 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: AppTheme.bgDark,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Top App Bar / Profile Header (Blu Style)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Row(
                     children: [
+                      // Avatar Circle FA
                       Container(
-                        width: 10,
-                        height: 10,
-                        decoration: const BoxDecoration(
-                          color: AppTheme.emeraldGreen,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'IRITOT',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.5,
-                          color: AppTheme.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        width: 38,
+                        height: 38,
                         decoration: BoxDecoration(
-                          color: AppTheme.surfaceLighter,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: AppTheme.borderDark),
+                          shape: BoxShape.circle,
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF10B981), Color(0xFF38BDF8)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppTheme.emeraldGreen.withValues(alpha: 0.35),
+                              blurRadius: 8,
+                            ),
+                          ],
                         ),
-                        child: Text(
-                          widget.localeService?.t('personalBadge') ?? 'PERSONAL',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: AppTheme.textSecondary,
+                        child: const Center(
+                          child: Text(
+                            'FA',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.black,
+                            ),
                           ),
                         ),
+                      ),
+                      const SizedBox(width: 10),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Text(
+                                'IRITOT',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.5,
+                                  color: AppTheme.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.surfaceLighter,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: AppTheme.borderDark),
+                                ),
+                                child: Text(
+                                  widget.localeService?.t('personalBadge') ?? 'PERSONAL',
+                                  style: const TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppTheme.cyanAccent,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          const Text(
+                            'Fawwazi Alamsyah',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.textMuted,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -195,7 +266,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       GestureDetector(
                         onTap: widget.onOpenAiAssistant,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
                           decoration: BoxDecoration(
                             color: AppTheme.violetAI.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(10),
@@ -227,7 +298,106 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+            ),
+
+            // Blu-style Horizontal Tab Bar (as circled in contoh.jpeg)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: SizedBox(
+                width: double.infinity,
+                child: TabBar(
+                  controller: _tabController,
+                  isScrollable: true,
+                  tabAlignment: TabAlignment.start,
+                  indicatorColor: AppTheme.cyanAccent,
+                  indicatorWeight: 3.0,
+                  indicatorSize: TabBarIndicatorSize.label,
+                  labelColor: AppTheme.textPrimary,
+                  unselectedLabelColor: AppTheme.textMuted,
+                  labelPadding: const EdgeInsets.only(right: 24, bottom: 8),
+                  labelStyle: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.2,
+                  ),
+                  unselectedLabelStyle: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.2,
+                  ),
+                  dividerColor: AppTheme.borderDark,
+                  dividerHeight: 1.0,
+                  tabs: [
+                    Tab(text: widget.localeService?.t('tabDailySpending') ?? 'Pemakaian Sehari-hari'),
+                    Tab(text: widget.localeService?.t('tabSavings') ?? 'Tabungan'),
+                  ],
+                ),
+              ),
+            ),
+
+            // TabBarView for both pages
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  // Page 1: Pemakaian Sehari-hari
+                  _buildDailySpendingPage(
+                    now: now,
+                    totalBalance: totalBalance,
+                    monthlyIncome: monthlyIncome,
+                    monthlyExpense: monthlyExpense,
+                    wallets: wallets,
+                    transactions: transactions,
+                    categories: categories,
+                    budgets: budgets,
+                    totalSavings: totalSavings,
+                    monthlySavingsIn: monthlySavingsIn,
+                    monthlySavingsOut: monthlySavingsOut,
+                    savingsPockets: savingsPockets,
+                    catMap: catMap,
+                    walletMap: walletMap,
+                  ),
+                  // Page 2: Tabungan
+                  SavingsScreen(
+                    storageService: widget.storageService,
+                    localeService: widget.localeService,
+                    onDataChanged: () {
+                      setState(() {});
+                      widget.onDataChanged();
+                    },
+                    showAppBar: false,
+                    isBalanceHidden: _isBalanceHidden,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDailySpendingPage({
+    required DateTime now,
+    required double totalBalance,
+    required double monthlyIncome,
+    required double monthlyExpense,
+    required List<Wallet> wallets,
+    required List<TransactionItem> transactions,
+    required List<CategoryItem> categories,
+    required List<Budget> budgets,
+    required double totalSavings,
+    required double monthlySavingsIn,
+    required double monthlySavingsOut,
+    required List<SavingsPocket> savingsPockets,
+    required Map<String, CategoryItem> catMap,
+    required Map<String, Wallet> walletMap,
+  }) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
 
               // Hero Balance Card
               Container(
@@ -402,7 +572,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   TextButton(
-                    onPressed: () => widget.onNavigateToTab(1),
+                    onPressed: () => _tabController.animateTo(1),
                     style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
                     child: Text(widget.localeService?.t('seeAll') ?? 'See All', style: const TextStyle(fontSize: 12, color: AppTheme.emeraldGreen)),
                   ),
@@ -410,7 +580,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 8),
               GestureDetector(
-                onTap: () => widget.onNavigateToTab(1),
+                onTap: () => _tabController.animateTo(1),
                 child: Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
@@ -720,9 +890,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 24),
             ],
           ),
-        ),
-      ),
-    );
+        );
   }
 
   Widget _buildActionButton({

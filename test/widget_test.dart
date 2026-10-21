@@ -46,16 +46,16 @@ void main() {
     // 4. Verify Home Screen elements after successful login
     expect(find.text('IRITOT'), findsOneWidget);
     expect(find.text('PERSONAL'), findsOneWidget);
+    expect(find.text('Daily Spending'), findsOneWidget);
     expect(find.text('TOTAL CASH BALANCE'), findsOneWidget);
     expect(find.text('SAVINGS & POCKETS'), findsOneWidget);
 
-    // 5. Verify Savings navigation item exists and tap it
-    expect(find.text('Savings'), findsOneWidget);
-    await tester.tap(find.text('Savings'));
+    // 5. Verify Savings tab item exists and tap it
+    expect(find.text('Savings'), findsNWidgets(2));
+    await tester.tap(find.text('Savings').first);
     await tester.pumpAndSettle();
 
     // 6. Verify Savings Screen elements in English
-    expect(find.text('Savings & Pockets'), findsOneWidget);
     expect(find.text('TOTAL SAVINGS'), findsOneWidget);
     expect(find.text('Deposit'), findsOneWidget);
     expect(find.text('Withdraw'), findsOneWidget);

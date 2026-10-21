@@ -11,12 +11,16 @@ class SavingsScreen extends StatefulWidget {
   final StorageService storageService;
   final LocaleService? localeService;
   final VoidCallback onDataChanged;
+  final bool showAppBar;
+  final bool? isBalanceHidden;
 
   const SavingsScreen({
     super.key,
     required this.storageService,
     this.localeService,
     required this.onDataChanged,
+    this.showAppBar = true,
+    this.isBalanceHidden,
   });
 
   @override
@@ -25,6 +29,7 @@ class SavingsScreen extends StatefulWidget {
 
 class _SavingsScreenState extends State<SavingsScreen> {
   bool _isBalanceHidden = false;
+  bool get _effectiveBalanceHidden => widget.isBalanceHidden ?? _isBalanceHidden;
   String _historyFilter = 'all'; // 'all', 'in', 'out'
 
   final NumberFormat _currencyFormat = NumberFormat.currency(
@@ -698,20 +703,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
       return true;
     }).toList();
 
-    return Scaffold(
-      backgroundColor: AppTheme.bgDark,
-      appBar: AppBar(
-        title: Text(widget.localeService?.t('savingsScreenTitle') ?? 'Savings & Pockets'),
-        actions: [
-          IconButton(
-            onPressed: () => setState(() => _isBalanceHidden = !_isBalanceHidden),
-            icon: Icon(_isBalanceHidden ? Icons.visibility_off : Icons.visibility, color: AppTheme.textSecondary, size: 20),
-            tooltip: 'Balance Privacy',
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
+    final scrollContent = SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -772,7 +764,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      _isBalanceHidden ? 'Rp ••••••••' : _currencyFormat.format(totalSavings),
+                      _effectiveBalanceHidden ? 'Rp ••••••••' : _currencyFormat.format(totalSavings),
                       style: const TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.w800,
@@ -1004,7 +996,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                _isBalanceHidden ? 'Rp ••••••••' : _currencyFormat.format(p.currentAmount),
+                                _effectiveBalanceHidden ? 'Rp ••••••••' : _currencyFormat.format(p.currentAmount),
                                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppTheme.textPrimary),
                               ),
                               if (p.targetAmount > 0)
@@ -1183,9 +1175,28 @@ class _SavingsScreenState extends State<SavingsScreen> {
               const SizedBox(height: 32),
             ],
           ),
+        );
+
+    if (widget.showAppBar) {
+      return Scaffold(
+        backgroundColor: AppTheme.bgDark,
+        appBar: AppBar(
+          title: Text(widget.localeService?.t('savingsScreenTitle') ?? 'Savings & Pockets'),
+          actions: [
+            IconButton(
+              onPressed: () => setState(() => _isBalanceHidden = !_isBalanceHidden),
+              icon: Icon(_effectiveBalanceHidden ? Icons.visibility_off : Icons.visibility, color: AppTheme.textSecondary, size: 20),
+              tooltip: 'Balance Privacy',
+            ),
+          ],
         ),
-      ),
-    );
+        body: SafeArea(
+          child: scrollContent,
+        ),
+      );
+    }
+
+    return scrollContent;
   }
 
   Widget _buildFilterChip(String val, String label) {

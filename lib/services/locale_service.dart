@@ -62,6 +62,10 @@ class LocaleService extends ChangeNotifier {
       'splashSubtitle': 'Ready to track smart spendings',
       'splashDecryption': 'Securing offline local vault...',
 
+      // Main Screen Tabs (Blu Style)
+      'tabDailySpending': 'Daily Spending',
+      'tabSavings': 'Savings',
+
       // Login Screen
       'loginTitle': 'Sign In to Your Account',
       'loginSubtitle': 'Local authentication stored on your phone.',
@@ -214,6 +218,10 @@ class LocaleService extends ChangeNotifier {
       'splashBadge': '⚡ SMART WEALTH FLOW',
       'splashSubtitle': 'Kelola keuangan harian lebih cerdas',
       'splashDecryption': 'Mengamankan brankas lokal...',
+
+      // Main Screen Tabs (Blu Style)
+      'tabDailySpending': 'Pemakaian Sehari-hari',
+      'tabSavings': 'Tabungan',
 
       // Login Screen
       'loginTitle': 'Masuk ke Akun Anda',
