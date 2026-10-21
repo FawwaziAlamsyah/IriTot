@@ -1,0 +1,1521 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IRITOT - Preview 3 Siluet Desain UI/UX</title>
+  <style>
+    :root {
+      --bg-page: #07090E;
+      --card-bg: #111622;
+      --border-color: #232B3E;
+      --text-main: #F1F5F9;
+      --text-muted: #94A3B8;
+      --accent-green: #10B981;
+      --accent-rose: #F43F5E;
+      --accent-blue: #38BDF8;
+      --accent-purple: #8B5CF6;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background: var(--bg-page);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px 60px;
+    }
+
+    /* Header Nav */
+    .header-banner {
+      max-width: 800px;
+      width: 100%;
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .app-title {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #FFFFFF;
+      margin-bottom: 8px;
+    }
+
+    .app-title span {
+      color: var(--accent-green);
+    }
+
+    .app-subtitle {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    /* Switcher Controls */
+    .concept-switcher {
+      display: flex;
+      background: #151C2C;
+      padding: 6px;
+      border-radius: 14px;
+      border: 1px solid var(--border-color);
+      gap: 6px;
+      max-width: 680px;
+      width: 100%;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    .concept-btn {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 10px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: center;
+    }
+
+    .concept-btn.active {
+      background: #232D42;
+      color: #FFFFFF;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    }
+
+    .concept-btn:hover:not(.active) {
+      color: #CBD5E1;
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    /* Explanation Banner */
+    .concept-meta {
+      max-width: 420px;
+      width: 100%;
+      background: #111726;
+      border: 1px solid #1E283D;
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-bottom: 20px;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .meta-title {
+      font-weight: 700;
+      color: #F8FAFC;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .meta-desc {
+      color: var(--text-muted);
+    }
+
+    /* Phone Mockup Frame */
+    .phone-wrapper {
+      position: relative;
+      width: 390px;
+      height: 780px;
+      background: #000000;
+      border-radius: 48px;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.9), 0 0 0 10px #1A2233, 0 0 0 12px #26324A;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Dynamic Island / Notch */
+    .phone-notch {
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 120px;
+      height: 28px;
+      background: #000000;
+      border-radius: 20px;
+      z-index: 100;
+      pointer-events: none;
+    }
+
+    .phone-screen {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding-top: 48px;
+      padding-bottom: 84px;
+      position: relative;
+    }
+
+    /* Scrollbar minimal */
+    .phone-screen::-webkit-scrollbar {
+      width: 4px;
+    }
+    .phone-screen::-webkit-scrollbar-thumb {
+      background: #232B3E;
+      border-radius: 4px;
+    }
+
+    /* Bottom Navigation in Phone */
+    .phone-bottom-nav {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 72px;
+      background: rgba(14, 18, 27, 0.92);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-top: 1px solid #1E2638;
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      padding: 0 12px;
+      z-index: 90;
+    }
+
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      background: none;
+      border: none;
+      color: #64748B;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      padding: 6px;
+    }
+
+    .nav-item.active {
+      color: var(--accent-green);
+    }
+
+    .nav-item svg {
+      width: 20px;
+      height: 20px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+    }
+
+    .nav-add-btn {
+      width: 48px;
+      height: 48px;
+      border-radius: 24px;
+      background: var(--accent-green);
+      color: #07090E;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      font-size: 24px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35);
+      transform: translateY(-8px);
+      transition: transform 0.15s ease;
+    }
+
+    .nav-add-btn:active {
+      transform: translateY(-5px) scale(0.96);
+    }
+
+    /* ========================================================
+       CONCEPT 1: SLEEK NEO-FINTECH
+       ======================================================== */
+    .c1-screen {
+      background: #0B0F17;
+      color: #F8FAFC;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .c1-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .c1-app-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      font-size: 16px;
+      letter-spacing: 0.5px;
+    }
+
+    .c1-badge-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--accent-green);
+      border-radius: 50%;
+    }
+
+    .c1-balance-card {
+      background: linear-gradient(145deg, #161F30 0%, #0F1726 100%);
+      border: 1px solid #233047;
+      border-radius: 22px;
+      padding: 20px;
+      position: relative;
+    }
+
+    .c1-balance-label {
+      font-size: 12px;
+      color: #94A3B8;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .c1-balance-amount {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #FFFFFF;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+    }
+
+    .c1-flow-row {
+      display: flex;
+      gap: 12px;
+      padding-top: 14px;
+      border-top: 1px solid #1D2A40;
+    }
+
+    .c1-flow-item {
+      flex: 1;
+    }
+
+    .c1-flow-title {
+      font-size: 11px;
+      color: #64748B;
+      margin-bottom: 2px;
+    }
+
+    .c1-flow-val {
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .c1-flow-val.in { color: var(--accent-green); }
+    .c1-flow-val.out { color: var(--accent-rose); }
+
+    .c1-section-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #94A3B8;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    /* Accounts Carousel */
+    .c1-accounts-list {
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+    .c1-accounts-list::-webkit-scrollbar { display: none; }
+
+    .c1-acc-pill {
+      flex-shrink: 0;
+      background: #141C2B;
+      border: 1px solid #222E42;
+      border-radius: 14px;
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      min-width: 120px;
+    }
+
+    .c1-acc-pill .acc-name {
+      font-size: 11px;
+      color: #94A3B8;
+    }
+
+    .c1-acc-pill .acc-bal {
+      font-size: 13px;
+      font-weight: 700;
+      color: #F8FAFC;
+      margin-top: 2px;
+    }
+
+    /* Action Grid */
+    .c1-actions-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .c1-action-btn {
+      background: #141D2D;
+      border: 1px solid #223048;
+      border-radius: 14px;
+      padding: 10px 4px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      color: #CBD5E1;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .c1-action-btn:hover {
+      background: #1C283E;
+    }
+
+    .c1-action-icon {
+      font-size: 18px;
+    }
+
+    /* Budget Bars */
+    .c1-budget-card {
+      background: #131B2A;
+      border: 1px solid #1E2A3E;
+      border-radius: 18px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .c1-budget-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .c1-budget-info {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .c1-budget-bar {
+      height: 6px;
+      background: #1E2A3E;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .c1-budget-fill {
+      height: 100%;
+      border-radius: 3px;
+    }
+
+    /* Transaction List */
+    .c1-tx-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .c1-tx-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #121927;
+      border: 1px solid #1A2438;
+      border-radius: 14px;
+      padding: 12px 14px;
+    }
+
+    .c1-tx-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .c1-tx-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: #1A2438;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .c1-tx-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #F1F5F9;
+    }
+
+    .c1-tx-meta {
+      font-size: 11px;
+      color: #64748B;
+      margin-top: 2px;
+    }
+
+    .c1-tx-amount {
+      font-size: 13px;
+      font-weight: 700;
+      text-align: right;
+    }
+
+    /* ========================================================
+       CONCEPT 2: NORDIC PAPER & CASHFLOW
+       ======================================================== */
+    .c2-screen {
+      background: #161618;
+      color: #F4F4F5;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .c2-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      border-bottom: 1px solid #27272A;
+      padding-bottom: 12px;
+    }
+
+    .c2-app-name {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #FFFFFF;
+    }
+
+    .c2-date-sub {
+      font-size: 12px;
+      color: #71717A;
+    }
+
+    .c2-safe-spend-box {
+      background: #1F1F23;
+      border: 1px solid #2E2E33;
+      border-radius: 16px;
+      padding: 18px;
+    }
+
+    .c2-safe-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #10B981;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .c2-safe-amount {
+      font-size: 32px;
+      font-weight: 800;
+      color: #FFFFFF;
+      letter-spacing: -1px;
+    }
+
+    .c2-safe-note {
+      font-size: 12px;
+      color: #A1A1AA;
+      margin-top: 6px;
+      line-height: 1.4;
+    }
+
+    .c2-grid-accounts {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .c2-acc-card {
+      background: #1B1B1E;
+      border: 1px solid #26262B;
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    .c2-acc-title {
+      font-size: 11px;
+      color: #71717A;
+    }
+
+    .c2-acc-val {
+      font-size: 14px;
+      font-weight: 700;
+      color: #F4F4F5;
+      margin-top: 4px;
+    }
+
+    .c2-timeline {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .c2-timeline-header {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: #71717A;
+      font-weight: 700;
+    }
+
+    .c2-entry {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px dashed #26262B;
+    }
+
+    .c2-entry:last-child {
+      border-bottom: none;
+    }
+
+    .c2-entry-main {
+      font-size: 13px;
+      font-weight: 500;
+      color: #E4E4E7;
+    }
+
+    .c2-entry-tag {
+      font-size: 10px;
+      color: #71717A;
+      margin-top: 2px;
+    }
+
+    .c2-entry-price {
+      font-size: 13px;
+      font-weight: 600;
+      color: #F43F5E;
+    }
+
+    .c2-quick-btn {
+      background: #27272A;
+      border: 1px solid #3F3F46;
+      color: #FFFFFF;
+      border-radius: 12px;
+      padding: 12px;
+      font-size: 13px;
+      font-weight: 600;
+      text-align: center;
+      cursor: pointer;
+    }
+
+    /* ========================================================
+       CONCEPT 3: DYNAMIC BENTO & GLANCEABLE CARDS
+       ======================================================== */
+    .c3-screen {
+      background: #090D16;
+      color: #FFFFFF;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .c3-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .c3-logo {
+      font-size: 17px;
+      font-weight: 900;
+      letter-spacing: -0.5px;
+      color: #38BDF8;
+    }
+
+    .c3-bento-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .c3-bento-hero {
+      grid-column: span 2;
+      background: #111827;
+      border: 1px solid #1F2937;
+      border-radius: 20px;
+      padding: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .c3-bento-card {
+      background: #111827;
+      border: 1px solid #1F2937;
+      border-radius: 18px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 90px;
+    }
+
+    .c3-card-sub {
+      font-size: 11px;
+      color: #9CA3AF;
+      font-weight: 500;
+    }
+
+    .c3-card-val {
+      font-size: 18px;
+      font-weight: 800;
+      color: #F9FAFB;
+      margin-top: 4px;
+    }
+
+    /* 3-Second Input Bar */
+    .c3-chips-section {
+      background: #0F172A;
+      border: 1px solid #1E293B;
+      border-radius: 16px;
+      padding: 12px;
+    }
+
+    .c3-chips-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #64748B;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .c3-chips-list {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+    }
+    .c3-chips-list::-webkit-scrollbar { display: none; }
+
+    .c3-chip {
+      background: #1E293B;
+      border: 1px solid #334155;
+      color: #E2E8F0;
+      padding: 8px 12px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    .c3-chip:hover {
+      background: #334155;
+      color: #38BDF8;
+    }
+
+    /* Modal Catat Dummy */
+    .demo-modal-toast {
+      position: absolute;
+      top: 60px;
+      left: 20px;
+      right: 20px;
+      background: rgba(16, 185, 129, 0.95);
+      color: #07090E;
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 700;
+      text-align: center;
+      display: none;
+      z-index: 120;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
+      pointer-events: none;
+    }
+
+    /* Footer Info */
+    .storage-info-card {
+      max-width: 520px;
+      width: 100%;
+      background: #0F172A;
+      border: 1px solid #1E293B;
+      border-radius: 16px;
+      padding: 16px 20px;
+      margin-top: 28px;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .storage-info-card h4 {
+      color: #F8FAFC;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 14px;
+    }
+
+    .storage-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      background: rgba(56, 189, 248, 0.15);
+      color: #38BDF8;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    /* Splash Screen Keyframes */
+    @keyframes pulseGlowEmblem {
+      0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 0 25px rgba(16, 185, 129, 0.35), inset 0 0 15px rgba(16, 185, 129, 0.2);
+      }
+      50% {
+        transform: scale(1.05);
+        box-shadow: 0 0 45px rgba(16, 185, 129, 0.6), inset 0 0 25px rgba(16, 185, 129, 0.4);
+      }
+    }
+
+    @keyframes neonProgressTrack {
+      0% { width: 0%; opacity: 0.4; }
+      50% { width: 65%; opacity: 1; }
+      100% { width: 100%; opacity: 0.9; }
+    }
+
+    @keyframes spinArc {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    @keyframes dotBreath {
+      0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
+      40% { opacity: 1; transform: scale(1.25); }
+    }
+
+    @keyframes shimmerTitle {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+
+    @keyframes floatGentle {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-4px); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header-banner">
+    <h1 class="app-title">IRI<span>TOT</span></h1>
+    <p class="app-subtitle">Siluet Interaktif Desain UI/UX - Khusus Keuangan Pribadi (Android & iPhone)</p>
+  </div>
+
+  <!-- Switcher Button -->
+  <div class="concept-switcher">
+    <button class="concept-btn active" onclick="switchConcept(1)">1. Sleek Neo-Fintech</button>
+    <button class="concept-btn" onclick="switchConcept(2)">2. Nordic Paper</button>
+    <button class="concept-btn" onclick="switchConcept(3)">3. Dynamic Bento</button>
+    <button class="concept-btn" onclick="switchConcept(4)">4. Kunci & Login (Offline)</button>
+    <button class="concept-btn" onclick="switchConcept(5)">5. 3 Pilihan Splash Screen</button>
+  </div>
+
+  <!-- Metadata Penjelasan Konsep -->
+  <div class="concept-meta" id="conceptMeta">
+    <div class="meta-title">
+      <span>✨ Konsep 1: Sleek Neo-Fintech</span>
+      <span class="storage-badge">Gaya Catat-in Modern</span>
+    </div>
+    <div class="meta-desc">
+      Menonjolkan saldo utama, carousel dompet/rekening, tombol aksi cepat, dan bar pantauan anggaran bulanan. Elegan, kontras tinggi, dan nyaman untuk mata.
+    </div>
+  </div>
+
+  <!-- Phone Container -->
+  <div class="phone-wrapper">
+    <div class="phone-notch"></div>
+    <div class="demo-modal-toast" id="demoToast">⚡ Transaksi Simulasi Tersimpan ke Storage Lokal!</div>
+
+    <div class="phone-screen" id="phoneScreen">
+      <!-- Di-render dinamis oleh JavaScript -->
+    </div>
+
+    <!-- Phone Bottom Navigation Bar -->
+    <div class="phone-bottom-nav">
+      <button class="nav-item active" onclick="showToast('Halaman Beranda')">
+        <svg viewBox="0 0 24 24"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <span>Beranda</span>
+      </button>
+
+      <button class="nav-item" onclick="showToast('Tabungan & Celengan (Total Rp 8.5jt)')">
+        <svg viewBox="0 0 24 24"><path d="M19 5c-1.5 0-2.8 1.2-3 2.7-.8-.4-1.8-.7-3-.7s-2.2.3-3 .7C9.8 6.2 8.5 5 7 5c-2.2 0-4 1.8-4 4 0 1.5.8 2.8 2 3.5V17c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2v-4.5c1.2-.7 2-2 2-3.5 0-2.2-1.8-4-4-4z"/><circle cx="12" cy="11" r="1.5"/></svg>
+        <span>Tabungan</span>
+      </button>
+
+      <button class="nav-add-btn" onclick="showToast('Input Transaksi Cepat (+)')">
+        ＋
+      </button>
+
+      <button class="nav-item" onclick="showToast('Laporan & Grafik')">
+        <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        <span>Laporan</span>
+      </button>
+
+      <button class="nav-item" onclick="showToast('Pengaturan & Backup CSV')">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span>Setelan</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Info Jawaban Pertanyaan Pengguna: Storage Tanpa Server Laptop -->
+  <div class="storage-info-card">
+    <h4>💡 Jawaban Pertanyaan Anda: "Apakah Bisa Tanpa Database Laptop?"</h4>
+    <p><strong>BISA BANGET dan 100% Offline!</strong></p>
+    <p style="margin-top: 6px; color: #94A3B8;">
+      Aplikasi ini menggunakan <strong>Local SQLite / File Storage langsung di dalam memori HP Anda</strong> (bukan di laptop). 
+      Sehingga:
+    </p>
+    <ul style="padding-left: 20px; margin-top: 6px; color: #CBD5E1;">
+      <li>Laptop Anda dimatikan sama sekali tidak masalah. HP tetap bisa mencatat daily kapan saja.</li>
+      <li>Tersedia fitur <strong>Ekspor & Impor CSV / Excel</strong> kapan pun Anda mau, sehingga Anda bisa simpan cadangan ke Google Drive atau WhatsApp.</li>
+      <li>Tidak butuh kuota internet untuk mencatat transaksi harian.</li>
+    </ul>
+  </div>
+
+  <script>
+    let currentConcept = 1;
+    let currentSplashOption = 2;
+    let isBalanceHidden = false;
+
+    function toggleBalance() {
+      isBalanceHidden = !isBalanceHidden;
+      renderCurrentConcept();
+    }
+
+    function switchSplashOption(opt) {
+      currentSplashOption = opt;
+      renderCurrentConcept();
+    }
+
+    function replaySplash() {
+      renderCurrentConcept();
+      showToast('Animasi Splash Screen diputar ulang!');
+    }
+
+    function showToast(text) {
+      const toast = document.getElementById('demoToast');
+      toast.innerText = text;
+      toast.style.display = 'block';
+      setTimeout(() => {
+        toast.style.display = 'none';
+      }, 2000);
+    }
+
+    function switchConcept(index) {
+      currentConcept = index;
+      document.querySelectorAll('.concept-btn').forEach((btn, idx) => {
+        btn.classList.toggle('active', idx === index - 1);
+      });
+
+      const meta = document.getElementById('conceptMeta');
+      if (index === 1) {
+        meta.innerHTML = `
+          <div class="meta-title">
+            <span>✨ Konsep 1: Sleek Neo-Fintech</span>
+            <span class="storage-badge">Gaya Catat-in Modern</span>
+          </div>
+          <div class="meta-desc">
+            Menonjolkan saldo utama, carousel dompet/rekening, tombol aksi cepat (Catat, Suara, Struk), dan bar pantauan anggaran bulanan. Elegan dan kontras tinggi.
+          </div>
+        `;
+      } else if (index === 2) {
+        meta.innerHTML = `
+          <div class="meta-title">
+            <span>🌿 Konsep 2: Nordic Paper & Cashflow</span>
+            <span class="storage-badge">Fokus Anti-Boros</span>
+          </div>
+          <div class="meta-desc">
+            Pendekatan kakeibo (buku kas taktis). Metrik utamanya adalah "Batas Belanja Aman Hari Ini" agar Anda tahu persis berapa yang boleh dihabiskan hari ini.
+          </div>
+        `;
+      } else if (index === 3) {
+        meta.innerHTML = `
+          <div class="meta-title">
+            <span>⚡ Konsep 3: Dynamic Bento & Glanceable Cards</span>
+            <span class="storage-badge">Input 3 Detik</span>
+          </div>
+          <div class="meta-desc">
+            Desain bento modular ala widget iOS 18 dengan chip kategori cepat di layar utama. Cukup tap kategori dan ketik nominal tanpa membuka form panjang.
+          </div>
+        `;
+      } else if (index === 4) {
+        meta.innerHTML = `
+          <div class="meta-title">
+            <span>🔒 Fitur: Layar Login & Keamanan Lokal</span>
+            <span class="storage-badge">100% Offline Lokal</span>
+          </div>
+          <div class="meta-desc">
+            Autentikasi offline tanpa register/sign-up. Kredensial default: <b>usertest</b> / <b>iritot123</b>. Dilengkapi proteksi Auto-Lock 5 menit saat aplikasi diminimize.
+          </div>
+        `;
+      } else {
+        meta.innerHTML = `
+          <div class="meta-title">
+            <span>🚀 3 Rekomendasi Desain Splash Screen</span>
+            <span class="storage-badge">Sleek Neo-Fintech</span>
+          </div>
+          <div class="meta-desc">
+            Silakan pilih di antara 3 konsep animasi pembuka IRITOT di bawah: (1) Obsidian Vault, (2) Neo-Fintech Growth Orbit, atau (3) Clean Zen Typographic.
+          </div>
+        `;
+      }
+
+      renderCurrentConcept();
+    }
+
+    function renderCurrentConcept() {
+      const screen = document.getElementById('phoneScreen');
+      const balText = isBalanceHidden ? "Rp ••••••••" : "Rp 14.850.000";
+
+      const bottomNav = document.querySelector('.phone-bottom-nav');
+      if (bottomNav) {
+        bottomNav.style.display = (currentConcept === 4 || currentConcept === 5) ? 'none' : 'flex';
+      }
+
+      if (currentConcept === 5) {
+        screen.style.paddingTop = '32px';
+        screen.style.paddingBottom = '0px';
+      } else if (currentConcept === 4) {
+        screen.style.paddingTop = '24px';
+        screen.style.paddingBottom = '24px';
+      } else {
+        screen.style.paddingTop = '48px';
+        screen.style.paddingBottom = '84px';
+      }
+
+      if (currentConcept === 1) {
+        screen.innerHTML = `
+          <div class="c1-screen">
+            <div class="c1-header">
+              <div class="c1-app-badge">
+                <div class="c1-badge-dot"></div>
+                <span>IRITOT PRIBADI</span>
+              </div>
+              <div style="cursor: pointer; font-size: 14px;" onclick="toggleBalance()">
+                ${isBalanceHidden ? "👁️‍🗨️ Tampilkan" : "👁️ Sembunyikan"}
+              </div>
+            </div>
+
+            <!-- Kartu Saldo -->
+            <div class="c1-balance-card">
+              <div class="c1-balance-label">
+                <span>TOTAL SALDO KAS</span>
+                <span style="font-size: 11px; color: #10B981;">● Oktober 2026</span>
+              </div>
+              <div class="c1-balance-amount">${balText}</div>
+              <div class="c1-flow-row">
+                <div class="c1-flow-item">
+                  <div class="c1-flow-title">Pemasukan</div>
+                  <div class="c1-flow-val in">+Rp 6.500.000</div>
+                </div>
+                <div class="c1-flow-item">
+                  <div class="c1-flow-title">Pengeluaran</div>
+                  <div class="c1-flow-val out">-Rp 2.350.000</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Dompet Saya -->
+            <div>
+              <div class="c1-section-title">Dompet & Rekening</div>
+              <div class="c1-accounts-list">
+                <div class="c1-acc-pill">
+                  <span class="acc-name">💵 Dompet Tunai</span>
+                  <span class="acc-bal">Rp 450.000</span>
+                </div>
+                <div class="c1-acc-pill">
+                  <span class="acc-name">🏦 Bank BCA</span>
+                  <span class="acc-bal">Rp 12.400.000</span>
+                </div>
+                <div class="c1-acc-pill">
+                  <span class="acc-name">📱 GoPay / OVO</span>
+                  <span class="acc-bal">Rp 2.000.000</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tabungan Saya Card -->
+            <div>
+              <div class="c1-section-title" style="display:flex; justify-content:space-between; align-items:center;">
+                <span>Tabungan & Celengan</span>
+                <span style="font-size:11px; color:#10B981; cursor:pointer;" onclick="showToast('Tab Tabungan Terbuka')">Buka Celengan →</span>
+              </div>
+              <div style="background: linear-gradient(145deg, #132225 0%, #0F1A1C 100%); border: 1px solid rgba(16,185,129,0.3); border-radius: 18px; padding: 14px 16px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                  <span style="font-size:11px; color:#94A3B8;">Total Tabungan Terkumpul</span>
+                  <span style="font-size:10px; background:rgba(16,185,129,0.2); color:#10B981; padding:2px 6px; border-radius:6px; font-weight:700;">3 Target</span>
+                </div>
+                <div style="font-size:20px; font-weight:800; color:#FFFFFF; margin-bottom:10px;">${isBalanceHidden ? "Rp ••••••••" : "Rp 8.500.000"}</div>
+                <div style="display:flex; gap:12px; font-size:11px; margin-bottom:10px;">
+                  <span style="color:#10B981; font-weight:600;">↓ Masuk: +Rp 3.500.000</span>
+                  <span style="color:#F43F5E; font-weight:600;">↑ Keluar: -Rp 250.000</span>
+                </div>
+                <div style="display:flex; gap:6px; overflow-x:auto;">
+                  <span style="font-size:10px; background:rgba(16,185,129,0.15); color:#10B981; border:1px solid rgba(16,185,129,0.3); padding:3px 8px; border-radius:8px; white-space:nowrap;">Dana Darurat: 43%</span>
+                  <span style="font-size:10px; background:rgba(56,189,248,0.15); color:#38BDF8; border:1px solid rgba(56,189,248,0.3); padding:3px 8px; border-radius:8px; white-space:nowrap;">Laptop: 33%</span>
+                  <span style="font-size:10px; background:rgba(139,92,246,0.15); color:#8B5CF6; border:1px solid rgba(139,92,246,0.3); padding:3px 8px; border-radius:8px; white-space:nowrap;">Liburan: 40%</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Aksi Cepat -->
+            <div>
+              <div class="c1-section-title">Aksi Cepat</div>
+              <div class="c1-actions-grid">
+                <div class="c1-action-btn" onclick="showToast('Buka Form Catat Transaksi')">
+                  <span class="c1-action-icon">✏️</span>
+                  <span>Catat</span>
+                </div>
+                <div class="c1-action-btn" onclick="showToast('Mendengarkan suara...')">
+                  <span class="c1-action-icon">🎙️</span>
+                  <span>Suara</span>
+                </div>
+                <div class="c1-action-btn" onclick="showToast('Kamera Scan Struk Aktif')">
+                  <span class="c1-action-icon">📸</span>
+                  <span>Struk</span>
+                </div>
+                <div class="c1-action-btn" onclick="showToast('Transfer Antar Rekening')">
+                  <span class="c1-action-icon">⇄</span>
+                  <span>Transfer</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Pantauan Anggaran -->
+            <div>
+              <div class="c1-section-title">Pantauan Anggaran</div>
+              <div class="c1-budget-card">
+                <div class="c1-budget-row">
+                  <div class="c1-budget-info">
+                    <span>🍜 Makan & Minum</span>
+                    <span style="font-weight:700; color:#F59E0B;">72%</span>
+                  </div>
+                  <div class="c1-budget-bar">
+                    <div class="c1-budget-fill" style="width: 72%; background: #F59E0B;"></div>
+                  </div>
+                </div>
+                <div class="c1-budget-row">
+                  <div class="c1-budget-info">
+                    <span>🛵 Transportasi & Bensin</span>
+                    <span style="font-weight:700; color:#10B981;">38%</span>
+                  </div>
+                  <div class="c1-budget-bar">
+                    <div class="c1-budget-fill" style="width: 38%; background: #10B981;"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Transaksi Terbaru -->
+            <div>
+              <div class="c1-section-title">Transaksi Terbaru</div>
+              <div class="c1-tx-list">
+                <div class="c1-tx-item">
+                  <div class="c1-tx-left">
+                    <div class="c1-tx-icon">☕</div>
+                    <div>
+                      <div class="c1-tx-title">Kopi Kenangan</div>
+                      <div class="c1-tx-meta">Hari ini • Dompet Tunai</div>
+                    </div>
+                  </div>
+                  <div class="c1-tx-amount" style="color:#F43F5E;">-Rp 22.000</div>
+                </div>
+
+                <div class="c1-tx-item">
+                  <div class="c1-tx-left">
+                    <div class="c1-tx-icon">⛽</div>
+                    <div>
+                      <div class="c1-tx-title">Isi Bensin Pertamax</div>
+                      <div class="c1-tx-meta">Kemarin • BCA</div>
+                    </div>
+                  </div>
+                  <div class="c1-tx-amount" style="color:#F43F5E;">-Rp 35.000</div>
+                </div>
+
+                <div class="c1-tx-item">
+                  <div class="c1-tx-left">
+                    <div class="c1-tx-icon">💼</div>
+                    <div>
+                      <div class="c1-tx-title">Gaji & Honor Pokok</div>
+                      <div class="c1-tx-meta">1 Okt • BCA</div>
+                    </div>
+                  </div>
+                  <div class="c1-tx-amount" style="color:#10B981;">+Rp 6.500.000</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      } else if (currentConcept === 2) {
+        screen.innerHTML = `
+          <div class="c2-screen">
+            <div class="c2-header">
+              <span class="c2-app-name">IRITOT</span>
+              <span class="c2-date-sub">Rabu, 14 Oktober 2026</span>
+            </div>
+
+            <div class="c2-safe-spend-box">
+              <div class="c2-safe-label">Batas Belanja Aman Hari Ini</div>
+              <div class="c2-safe-amount">Rp 185.000</div>
+              <div class="c2-safe-note">
+                Dihitung dari sisa budget bulanan dibagi 17 hari tersisa. Pengeluaran hari ini masih aman!
+              </div>
+            </div>
+
+            <div>
+              <div style="font-size: 11px; text-transform: uppercase; color: #71717A; font-weight: 700; margin-bottom: 8px;">Ringkasan Kas Pribadi</div>
+              <div class="c2-grid-accounts">
+                <div class="c2-acc-card">
+                  <div class="c2-acc-title">Uang Tunai</div>
+                  <div class="c2-acc-val">Rp 450.000</div>
+                </div>
+                <div class="c2-acc-card">
+                  <div class="c2-acc-title">Rekening Bank</div>
+                  <div class="c2-acc-val">Rp 12.400.000</div>
+                </div>
+                <div class="c2-acc-card">
+                  <div class="c2-acc-title">E-Wallet</div>
+                  <div class="c2-acc-val">Rp 2.000.000</div>
+                </div>
+                <div class="c2-acc-card" style="background:#222226;">
+                  <div class="c2-acc-title">Total Kekayaan</div>
+                  <div class="c2-acc-val" style="color:#10B981;">${balText}</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="c2-quick-btn" onclick="showToast('Catat Pengeluaran Cepat')">
+              ＋ Catat Pengeluaran Baru
+            </div>
+
+            <div class="c2-timeline">
+              <div class="c2-timeline-header">Catatan Hari Ini</div>
+              <div class="c2-entry">
+                <div>
+                  <div class="c2-entry-main">Makan Siang Nasi Padang</div>
+                  <div class="c2-entry-tag">#makan • 12:45</div>
+                </div>
+                <div class="c2-entry-price">-Rp 25.000</div>
+              </div>
+              <div class="c2-entry">
+                <div>
+                  <div class="c2-entry-main">Es Kopi Susu</div>
+                  <div class="c2-entry-tag">#jajan • 09:10</div>
+                </div>
+                <div class="c2-entry-price">-Rp 18.000</div>
+              </div>
+            </div>
+
+            <div class="c2-timeline">
+              <div class="c2-timeline-header">Kemarin (13 Okt)</div>
+              <div class="c2-entry">
+                <div>
+                  <div class="c2-entry-main">Belanja Kebutuhan Rumah</div>
+                  <div class="c2-entry-tag">#belanja • Superindo</div>
+                </div>
+                <div class="c2-entry-price">-Rp 114.500</div>
+              </div>
+            </div>
+          </div>
+        `;
+      } else if (currentConcept === 3) {
+        screen.innerHTML = `
+          <div class="c3-screen">
+            <div class="c3-header">
+              <span class="c3-logo">⚡ IRITOT</span>
+              <span style="font-size:12px; color:#9CA3AF; cursor:pointer;" onclick="toggleBalance()">
+                ${isBalanceHidden ? "👁️‍🗨️" : "👁️"}
+              </span>
+            </div>
+
+            <!-- Bento Modular Cards -->
+            <div class="c3-bento-grid">
+              <div class="c3-bento-hero">
+                <div>
+                  <div class="c3-card-sub">Total Saldo Likuid</div>
+                  <div class="c3-card-val" style="font-size:24px; color:#38BDF8;">${balText}</div>
+                </div>
+                <div style="text-align:right;">
+                  <span style="font-size:10px; background:rgba(16,185,129,0.2); color:#10B981; padding:3px 8px; border-radius:6px; font-weight:700;">+3.2% Bln Ini</span>
+                </div>
+              </div>
+
+              <div class="c3-bento-card">
+                <div class="c3-card-sub">Jajan Hari Ini</div>
+                <div class="c3-card-val" style="color:#F43F5E;">Rp 43.000</div>
+                <span style="font-size:10px; color:#6B7280;">2 transaksi</span>
+              </div>
+
+              <div class="c3-bento-card">
+                <div class="c3-card-sub">Sisa Budget</div>
+                <div class="c3-card-val" style="color:#10B981;">68%</div>
+                <span style="font-size:10px; color:#6B7280;">Rp 2.15jt aman</span>
+              </div>
+            </div>
+
+            <!-- Input 3 Detik (Category Chips) -->
+            <div class="c3-chips-section">
+              <div class="c3-chips-title">Input 3 Detik (Tap Langsung Catat)</div>
+              <div class="c3-chips-list">
+                <div class="c3-chip" onclick="showToast('Catat Cepat: 🍜 Makan Siang')">🍜 Makan</div>
+                <div class="c3-chip" onclick="showToast('Catat Cepat: ☕ Kopi')">☕ Kopi</div>
+                <div class="c3-chip" onclick="showToast('Catat Cepat: ⛽ Bensin')">⛽ Bensin</div>
+                <div class="c3-chip" onclick="showToast('Catat Cepat: 🛒 Belanja')">🛒 Mart</div>
+                <div class="c3-chip" onclick="showToast('Catat Cepat: 🚌 Ojol')">🛵 Ojol</div>
+              </div>
+            </div>
+
+            <!-- Dompet Tab Bar -->
+            <div style="background:#111827; border:1px solid #1F2937; border-radius:14px; padding:12px;">
+              <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:6px;">
+                <span style="color:#9CA3AF;">Dompet Kas</span>
+                <span style="color:#38BDF8; font-weight:700;">3 Akun Terhubung</span>
+              </div>
+              <div style="font-size:13px; font-weight:700; color:#E5E7EB;">
+                💵 Dompet 450rb &nbsp;•&nbsp; 💳 BCA 12.4M &nbsp;•&nbsp; 📱 GoPay 2M
+              </div>
+            </div>
+
+            <!-- Riwayat -->
+            <div>
+              <div style="font-size:11px; text-transform:uppercase; color:#6B7280; font-weight:700; margin-bottom:8px;">Aktivitas Terakhir</div>
+              <div style="display:flex; flex-direction:column; gap:8px;">
+                <div style="background:#111827; border:1px solid #1F2937; border-radius:12px; padding:10px 12px; display:flex; justify-content:space-between; align-items:center;">
+                  <div>
+                    <div style="font-size:13px; font-weight:600;">Makan Siang Ayam Geprek</div>
+                    <div style="font-size:10px; color:#6B7280;">Makan & Minum • 12:30</div>
+                  </div>
+                  <div style="font-size:13px; font-weight:700; color:#F43F5E;">-Rp 25.000</div>
+                </div>
+
+                <div style="background:#111827; border:1px solid #1F2937; border-radius:12px; padding:10px 12px; display:flex; justify-content:space-between; align-items:center;">
+                  <div>
+                    <div style="font-size:13px; font-weight:600;">Es Kopi Gula Aren</div>
+                    <div style="font-size:10px; color:#6B7280;">Jajan Harian • 09:15</div>
+                  </div>
+                  <div style="font-size:13px; font-weight:700; color:#F43F5E;">-Rp 18.000</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      } else if (currentConcept === 4) {
+        screen.innerHTML = `
+          <div style="padding: 24px 16px; display:flex; flex-direction:column; align-items:center; min-height: 100%; justify-content: center; background: #0B0F17; color: #F8FAFC;">
+            <!-- Header Logo -->
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+              <div style="width:12px; height:12px; border-radius:50%; background:#10B981;"></div>
+              <div style="font-size:28px; font-weight:900; letter-spacing:1px; color:#F8FAFC;">IRITOT</div>
+            </div>
+            <div style="font-size:12px; color:#94A3B8; text-align:center; margin-bottom:24px;">
+              Personal Finance Tracker • 100% Offline Local
+            </div>
+
+            <!-- Login Card -->
+            <div style="width:100%; background:#131B2A; border:1.5px solid #1E283D; border-radius:22px; padding:20px; box-shadow:0 12px 30px rgba(0,0,0,0.5);">
+              <div style="font-size:16px; font-weight:800; color:#F8FAFC; margin-bottom:2px;">Sign In to Your Account</div>
+              <div style="font-size:11px; color:#94A3B8; margin-bottom:16px;">Local authentication stored on your phone.</div>
+
+              <div style="font-size:11px; font-weight:600; color:#CBD5E1; margin-bottom:4px;">Username:</div>
+              <input type="text" id="demoUser" placeholder="Enter username" style="width:100%; padding:10px 12px; background:#1C2638; border:1px solid #28374F; border-radius:12px; color:#F8FAFC; font-size:13px; margin-bottom:12px; box-sizing:border-box;">
+
+              <div style="font-size:11px; font-weight:600; color:#CBD5E1; margin-bottom:4px;">Password:</div>
+              <input type="password" id="demoPass" placeholder="Enter password" style="width:100%; padding:10px 12px; background:#1C2638; border:1px solid #28374F; border-radius:12px; color:#F8FAFC; font-size:13px; margin-bottom:12px; box-sizing:border-box;">
+
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <label style="font-size:11px; color:#94A3B8; display:flex; align-items:center; gap:6px; cursor:pointer;">
+                  <input type="checkbox" checked style="accent-color:#10B981;"> Remember Me
+                </label>
+              </div>
+
+              <button onclick="handleDemoLogin()" style="width:100%; padding:12px; background:#10B981; border:none; border-radius:14px; font-size:14px; font-weight:800; color:#000000; cursor:pointer; transition:all 0.15s ease;">
+                Sign In to IRITOT
+              </button>
+            </div>
+
+            <!-- Preview Card Auto-Lock 5 Menit & Setelan -->
+            <div style="margin-top:20px; width:100%; background:#0F1624; border:1px dashed #24334D; border-radius:16px; padding:14px;">
+              <div style="font-size:12px; font-weight:700; color:#38BDF8; margin-bottom:4px; display:flex; align-items:center; gap:6px;">
+                <span>🛡️ Security: Auto-Lock 5 Minutes</span>
+              </div>
+              <div style="font-size:10px; color:#94A3B8; line-height:1.4; margin-bottom:10px;">
+                Leaving or minimizing the app for more than 5 minutes will automatically lock the session to protect your financial privacy.
+              </div>
+              <div style="font-size:12px; font-weight:700; color:#10B981; margin-bottom:4px; display:flex; align-items:center; gap:6px;">
+                <span>⚙️ Settings: Language & Account Security</span>
+              </div>
+              <div style="font-size:10px; color:#94A3B8; line-height:1.4; margin-bottom:10px;">
+                Default app language is English (switchable to Bahasa Indonesia in Settings). You can also change username & password in Settings with previous credentials verification.
+              </div>
+              <button onclick="switchConcept(1); showToast('Open Settings to change language or credentials');" style="width:100%; background:#1C2638; border:1px solid #28374F; color:#CBD5E1; padding:8px; border-radius:10px; font-size:11px; font-weight:600; cursor:pointer;">
+                View Settings Screen &rarr;
+              </button>
+            </div>
+          </div>
+        `;
+      } else if (currentConcept === 5) {
+        let splashContent = '';
+
+        if (currentSplashOption === 1) {
+          // 1. The Obsidian Vault (Pulse Glow & Geometric Shield)
+          splashContent = `
+            <div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; width:100%; text-align:center; padding:24px 20px;">
+              <!-- Emblem Perisai Heksagon Bercahaya -->
+              <div style="width:84px; height:84px; border-radius:26px; background:linear-gradient(145deg, #131E30, #09101A); border:2px solid #10B981; display:flex; align-items:center; justify-content:center; margin-bottom:24px; animation:pulseGlowEmblem 2.2s infinite ease-in-out; position:relative;">
+                <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                  <path d="m9 12 2 2 4-4"/>
+                </svg>
+              </div>
+
+              <!-- Brand Name -->
+              <div style="font-size:32px; font-weight:900; letter-spacing:5px; color:#F8FAFC; margin-bottom:6px;">
+                IRI<span style="color:#10B981;">TOT</span>
+              </div>
+              <div style="font-size:11px; letter-spacing:1.5px; text-transform:uppercase; color:#94A3B8; font-weight:600; margin-bottom:28px;">
+                100% Private • Local Vault
+              </div>
+
+              <!-- Thin Neon Progress Line -->
+              <div style="width:160px; height:3px; background:#1E293B; border-radius:99px; overflow:hidden; position:relative;">
+                <div style="height:100%; background:linear-gradient(90deg, #10B981, #38BDF8); border-radius:99px; animation:neonProgressTrack 2s infinite ease-out;"></div>
+              </div>
+              <div style="font-size:10px; color:#64748B; margin-top:8px;">Decrypting local database...</div>
+            </div>
+          `;
+        } else if (currentSplashOption === 2) {
+          // 2. Neo-Fintech Growth Orbit (Dynamic Curve Arc & Cyan/Emerald)
+          splashContent = `
+            <div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; width:100%; text-align:center; padding:24px 20px;">
+              <!-- Growth Orbit Icon -->
+              <div style="width:90px; height:90px; position:relative; display:flex; align-items:center; justify-content:center; margin-bottom:24px;">
+                <!-- Orbit Ring -->
+                <div style="position:absolute; width:100%; height:100%; border-radius:50%; border:3px dashed #10B981; border-top-color:#38BDF8; border-right-color:transparent; animation:spinArc 2.8s linear infinite;"></div>
+                <!-- Inner Icon Box -->
+                <div style="width:64px; height:64px; border-radius:20px; background:linear-gradient(135deg, rgba(16,185,129,0.18), rgba(56,189,248,0.18)); border:1.5px solid rgba(56,189,248,0.5); display:flex; align-items:center; justify-content:center; animation:floatGentle 2.5s infinite ease-in-out;">
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+                    <polyline points="17 6 23 6 23 12"/>
+                  </svg>
+                </div>
+              </div>
+
+              <!-- Brand Name with Shimmer -->
+              <div style="font-size:30px; font-weight:900; letter-spacing:3px; background:linear-gradient(90deg, #F8FAFC 0%, #10B981 50%, #38BDF8 100%); background-size:200% auto; -webkit-background-clip:text; -webkit-text-fill-color:transparent; animation:shimmerTitle 3s infinite linear; margin-bottom:8px;">
+                IRITOT
+              </div>
+              <div style="display:inline-block; padding:4px 12px; background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.25); border-radius:20px; font-size:10px; font-weight:700; color:#10B981; letter-spacing:0.5px; margin-bottom:20px;">
+                SMART WEALTH FLOW
+              </div>
+
+              <!-- Status Loading Subtext -->
+              <div style="font-size:10px; color:#64748B;">Ready to track smart spendings</div>
+            </div>
+          `;
+        } else {
+          // 3. Clean Zen Typographic (Ultra-Fast Monogram & Breathing Dots)
+          splashContent = `
+            <div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; width:100%; text-align:center; padding:24px 20px;">
+              <!-- Large Minimal Monogram -->
+              <div style="display:flex; align-items:flex-start; justify-content:center; margin-bottom:8px; position:relative;">
+                <div style="font-size:42px; font-weight:900; letter-spacing:2px; color:#FFFFFF; line-height:1;">
+                  IRI<span style="color:#10B981;">TOT</span>
+                </div>
+                <div style="width:8px; height:8px; border-radius:50%; background:#10B981; box-shadow:0 0 10px #10B981; margin-left:4px; margin-top:2px;"></div>
+              </div>
+
+              <div style="font-size:11px; color:#94A3B8; letter-spacing:1px; margin-bottom:30px;">
+                Instant Local Ledger
+              </div>
+
+              <!-- 3 Breathing Dots -->
+              <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+                <div style="width:8px; height:8px; border-radius:50%; background:#10B981; animation:dotBreath 1.4s infinite ease-in-out; animation-delay:0s;"></div>
+                <div style="width:8px; height:8px; border-radius:50%; background:#10B981; animation:dotBreath 1.4s infinite ease-in-out; animation-delay:0.2s;"></div>
+                <div style="width:8px; height:8px; border-radius:50%; background:#10B981; animation:dotBreath 1.4s infinite ease-in-out; animation-delay:0.4s;"></div>
+              </div>
+              <div style="font-size:10px; color:#64748B; font-weight:600;">Securing Local Vault (1.2s)...</div>
+            </div>
+          `;
+        }
+
+        screen.innerHTML = `
+          <div style="min-height:100%; height:100%; display:flex; flex-direction:column; background:#070A12; color:#F8FAFC; justify-content:space-between; position:relative; box-sizing:border-box;">
+            <!-- Selector Sub-Tab di Atas Mockup -->
+            <div style="padding:10px 10px 8px; background:#0C121F; border-bottom:1px solid #1C263A; display:flex; gap:4px; justify-content:space-between; align-items:center;">
+              <button onclick="switchSplashOption(1)" style="flex:1; padding:6px 2px; font-size:10px; font-weight:700; border-radius:8px; border:none; cursor:pointer; background:${currentSplashOption === 1 ? '#10B981' : '#172236'}; color:${currentSplashOption === 1 ? '#000000' : '#94A3B8'}; transition:all 0.15s ease;">
+                1. Vault
+              </button>
+              <button onclick="switchSplashOption(2)" style="flex:1; padding:6px 2px; font-size:10px; font-weight:700; border-radius:8px; border:none; cursor:pointer; background:${currentSplashOption === 2 ? '#10B981' : '#172236'}; color:${currentSplashOption === 2 ? '#000000' : '#94A3B8'}; transition:all 0.15s ease;">
+                2. Orbit
+              </button>
+              <button onclick="switchSplashOption(3)" style="flex:1; padding:6px 2px; font-size:10px; font-weight:700; border-radius:8px; border:none; cursor:pointer; background:${currentSplashOption === 3 ? '#10B981' : '#172236'}; color:${currentSplashOption === 3 ? '#000000' : '#94A3B8'}; transition:all 0.15s ease;">
+                3. Zen
+              </button>
+            </div>
+
+            ${splashContent}
+
+            <!-- Bottom Action Controller -->
+            <div style="padding:12px; background:#0C121F; border-top:1px solid #1C263A; display:flex; gap:8px; justify-content:center;">
+              <button onclick="replaySplash()" style="flex:1; background:#1A2538; border:1px solid #28374F; color:#CBD5E1; padding:8px 6px; border-radius:10px; font-size:10px; font-weight:700; cursor:pointer;">
+                🔄 Putar Ulang
+              </button>
+              <button onclick="switchConcept(4); showToast('Beralih ke Layar Login');" style="flex:1; background:#10B981; border:none; color:#000000; padding:8px 6px; border-radius:10px; font-size:10px; font-weight:800; cursor:pointer;">
+                Ke Login &rarr;
+              </button>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    function handleDemoLogin() {
+      const u = document.getElementById('demoUser') ? document.getElementById('demoUser').value.trim() : '';
+      const p = document.getElementById('demoPass') ? document.getElementById('demoPass').value : '';
+      if (!u || !p) {
+        showToast('⚠️ Please enter username and password!');
+        return;
+      }
+      if (u === 'usertest' && p === 'iritot123') {
+        showToast('✅ Login Successful! Redirecting to Home...');
+        setTimeout(() => switchConcept(1), 700);
+      } else {
+        showToast('❌ Incorrect username or password!');
+      }
+    }
+
+    // Inisialisasi awal
+    renderCurrentConcept();
+  </script>
+</body>
+</html>
