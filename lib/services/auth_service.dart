@@ -6,6 +6,7 @@ class AuthService {
   static const String _keyDisplayName = 'iritot_auth_display_name';
   static const String _keyIsLoggedIn = 'iritot_auth_is_logged_in';
   static const String _keyRememberMe = 'iritot_auth_remember_me';
+  static const String _keySavedUsername = 'iritot_auth_saved_username';
   static const String _keyLastActiveTimestamp = 'iritot_auth_last_active_timestamp';
 
   // Batas waktu sesi di latar belakang: 5 menit (300.000 milidetik)
@@ -36,6 +37,12 @@ class AuthService {
     }
     if (!_prefs.containsKey(_keyPassword)) {
       await _prefs.setString(_keyPassword, defaultPassword);
+    }
+    if (!_prefs.containsKey(_keyRememberMe)) {
+      await _prefs.setBool(_keyRememberMe, true);
+    }
+    if (!_prefs.containsKey(_keySavedUsername) && (_prefs.getBool(_keyRememberMe) ?? true)) {
+      await _prefs.setString(_keySavedUsername, defaultUsername);
     }
   }
 
@@ -70,6 +77,20 @@ class AuthService {
 
   bool isRememberMe() {
     return _prefs.getBool(_keyRememberMe) ?? true;
+  }
+
+  String? getSavedUsername() {
+    if (!isRememberMe()) return null;
+    return _prefs.getString(_keySavedUsername) ?? getUsername();
+  }
+
+  Future<void> setRememberMe(bool value) async {
+    await _prefs.setBool(_keyRememberMe, value);
+    if (!value) {
+      await _prefs.remove(_keySavedUsername);
+    } else {
+      await _prefs.setString(_keySavedUsername, getUsername());
+    }
   }
 
   // Perbarui stempel waktu terakhir aktif
@@ -109,6 +130,11 @@ class AuthService {
     if (matchesUser && password == currentPassword) {
       await _prefs.setBool(_keyIsLoggedIn, true);
       await _prefs.setBool(_keyRememberMe, rememberMe);
+      if (rememberMe) {
+        await _prefs.setString(_keySavedUsername, username.trim());
+      } else {
+        await _prefs.remove(_keySavedUsername);
+      }
       await updateLastActiveTimestamp();
       return true;
     }
@@ -163,6 +189,9 @@ class AuthService {
 
     await _prefs.setString(_keyDisplayName, trimmedName);
     await _prefs.setString(_keyUsername, trimmedUser);
+    if (isRememberMe()) {
+      await _prefs.setString(_keySavedUsername, trimmedUser);
+    }
 
     return {
       'success': true,
@@ -217,6 +246,9 @@ class AuthService {
     // 3. Simpan kredensial baru ke database lokal
     await _prefs.setString(_keyUsername, newUsername.trim());
     await _prefs.setString(_keyPassword, newPassword);
+    if (isRememberMe()) {
+      await _prefs.setString(_keySavedUsername, newUsername.trim());
+    }
     if (newDisplayName != null && newDisplayName.trim().isNotEmpty) {
       await _prefs.setString(_keyDisplayName, newDisplayName.trim());
     }

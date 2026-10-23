@@ -308,7 +308,7 @@ class MainNavigationScaffold extends StatefulWidget {
 
 class _MainNavigationScaffoldState extends State<MainNavigationScaffold> {
   int _currentIndex = 0;
-  int _homeTabIndex = 0;
+  final int _homeTabIndex = 0;
 
   void _onDataChanged() {
     widget.authService.updateLastActiveTimestamp();
@@ -355,14 +355,7 @@ class _MainNavigationScaffoldState extends State<MainNavigationScaffold> {
         localeService: widget.localeService,
         onDataChanged: _onDataChanged,
         onNavigateToTab: (index) {
-          if (index == 1) {
-            setState(() {
-              _homeTabIndex = 1;
-              _currentIndex = 0;
-            });
-          } else {
-            setState(() => _currentIndex = index);
-          }
+          setState(() => _currentIndex = index);
         },
         onOpenAiAssistant: _openAiAssistant,
         initialTabIndex: _homeTabIndex,
@@ -408,21 +401,11 @@ class _MainNavigationScaffoldState extends State<MainNavigationScaffold> {
           border: Border(top: BorderSide(color: AppTheme.borderDark, width: 1)),
         ),
         child: BottomNavigationBar(
-          currentIndex: (_currentIndex == 0 && _homeTabIndex == 1) ? 1 : (_currentIndex == 2 ? 0 : _currentIndex),
+          currentIndex: _currentIndex == 2 ? 0 : _currentIndex,
           onTap: (index) {
             widget.authService.updateLastActiveTimestamp();
             if (index == 2) {
               _openAddModal();
-            } else if (index == 1) {
-              setState(() {
-                _homeTabIndex = 1;
-                _currentIndex = 0;
-              });
-            } else if (index == 0) {
-              setState(() {
-                _homeTabIndex = 0;
-                _currentIndex = 0;
-              });
             } else {
               setState(() => _currentIndex = index);
             }

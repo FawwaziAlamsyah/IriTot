@@ -139,8 +139,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     borderRadius: BorderRadius.circular(18),
                     border: Border.all(color: AppTheme.borderDark),
                   ),
-                  child: const Center(
-                    child: Text('Belum ada data pengeluaran bulan ini.', style: TextStyle(color: AppTheme.textMuted, fontSize: 13)),
+                  child: Center(
+                    child: Text(
+                      widget.localeService?.t('noExpenseData') ?? 'No expense data this month.',
+                      style: const TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                    ),
                   ),
                 )
               else ...[
@@ -198,9 +201,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 const SizedBox(height: 20),
 
                 // Rincian List Kategori
-                const Text(
-                  'RINCIAN BELANJA',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.5, color: AppTheme.textSecondary),
+                Text(
+                  widget.localeService?.t('expenseDetails') ?? 'EXPENSE DETAILS',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.5, color: AppTheme.textSecondary),
                 ),
                 const SizedBox(height: 10),
 

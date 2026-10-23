@@ -38,6 +38,8 @@ class _SavingsScreenState extends State<SavingsScreen> {
     decimalDigits: 0,
   );
 
+  String t(String key) => widget.localeService?.t(key) ?? key;
+
   void _confirmDeletePocket(SavingsPocket p) {
     showDialog(
       context: context,
@@ -53,7 +55,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'Hapus Pos "${p.name}"',
+                t('deletePocketTitle').replaceAll('{name}', p.name),
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
               ),
             ),
@@ -61,14 +63,14 @@ class _SavingsScreenState extends State<SavingsScreen> {
         ),
         content: Text(
           p.currentAmount > 0
-              ? 'Pos celengan ini masih memiliki saldo ${_currencyFormat.format(p.currentAmount)}. Sisa saldo ini akan otomatis dikembalikan ke dompet kas.'
-              : 'Apakah Anda yakin ingin menghapus pos celengan ini?',
+              ? t('deletePocketHasBalance').replaceAll('{amount}', _currencyFormat.format(p.currentAmount))
+              : t('deletePocketEmpty'),
           style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary, height: 1.4),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogCtx),
-            child: const Text('Batal', style: TextStyle(color: AppTheme.textMuted)),
+            child: Text(t('cancel'), style: const TextStyle(color: AppTheme.textMuted)),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -83,7 +85,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
               backgroundColor: AppTheme.coralRose,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Hapus Pos', style: TextStyle(fontWeight: FontWeight.w700)),
+            child: Text(t('deletePocketBtn'), style: const TextStyle(fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -101,8 +103,8 @@ class _SavingsScreenState extends State<SavingsScreen> {
     }
     if (wallets.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Tambahkan dompet terlebih dahulu di menu Setelan.'),
+        SnackBar(
+          content: Text(t('addWalletFirstAlert')),
           backgroundColor: AppTheme.coralRose,
         ),
       );
@@ -112,7 +114,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
     String selectedPocketId = preselectedPocket?.id ?? pockets.first.id;
     String selectedWalletId = wallets.first.id;
     final amountCtrl = TextEditingController();
-    final noteCtrl = TextEditingController(text: 'Nabung bulanan');
+    final noteCtrl = TextEditingController(text: widget.localeService?.isIndonesian == true ? 'Nabung bulanan' : 'Monthly savings');
 
     showModalBottomSheet(
       context: context,
@@ -154,20 +156,20 @@ class _SavingsScreenState extends State<SavingsScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    const Row(
+                    Row(
                       children: [
-                        Icon(Icons.arrow_downward_rounded, color: AppTheme.emeraldGreen, size: 22),
-                        SizedBox(width: 8),
+                        const Icon(Icons.arrow_downward_rounded, color: AppTheme.emeraldGreen, size: 22),
+                        const SizedBox(width: 8),
                         Text(
-                          'Setor Tabungan (Masuk)',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.textPrimary),
+                          t('depositTitle'),
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.textPrimary),
                         ),
                       ],
                     ),
                     const SizedBox(height: 16),
 
                     // Pilih Kantong Tujuan
-                    const Text('Kantong Tabungan Tujuan:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+                    Text(t('targetPocketLabel'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
                     const SizedBox(height: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -209,9 +211,9 @@ class _SavingsScreenState extends State<SavingsScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Ambil Dari Dompet:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+                        Text(t('sourceWalletLabel'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
                         Text(
-                          'Saldo: ${_currencyFormat.format(activeWallet.balance)}',
+                          '${t('available')}: ${_currencyFormat.format(activeWallet.balance)}',
                           style: const TextStyle(fontSize: 11, color: AppTheme.cyanAccent, fontWeight: FontWeight.w600),
                         ),
                       ],
@@ -244,7 +246,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
                     const SizedBox(height: 14),
 
                     // Nominal Input
-                    const Text('Nominal Tabungan (Rp):', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+                    Text(t('nominal'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
                     const SizedBox(height: 6),
                     TextField(
                       controller: amountCtrl,
@@ -270,7 +272,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
                             padding: const EdgeInsets.only(right: 6),
                             child: ActionChip(
                               label: Text(
-                                '+${(amt / 1000).toInt()}rb',
+                                '+${(amt / 1000).toInt()}k',
                                 style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
                               ),
                               backgroundColor: AppTheme.surfaceLighter,
@@ -288,13 +290,13 @@ class _SavingsScreenState extends State<SavingsScreen> {
                     const SizedBox(height: 14),
 
                     // Catatan
-                    const Text('Keterangan:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+                    Text(t('noteOptional'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
                     const SizedBox(height: 6),
                     TextField(
                       controller: noteCtrl,
                       style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
                       decoration: InputDecoration(
-                        hintText: 'Contoh: Alokasi gaji awal bulan',
+                        hintText: widget.localeService?.isIndonesian == true ? 'Contoh: Alokasi gaji awal bulan' : 'e.g. Monthly salary allocation',
                         filled: true,
                         fillColor: AppTheme.surfaceLighter,
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppTheme.borderDark)),
@@ -314,8 +316,8 @@ class _SavingsScreenState extends State<SavingsScreen> {
 
                           if (amount > activeWallet.balance) {
                             ScaffoldMessenger.of(modalCtx).showSnackBar(
-                              const SnackBar(
-                                content: Text('Saldo dompet sumber tidak mencukupi.'),
+                              SnackBar(
+                                content: Text(widget.localeService?.isIndonesian == true ? 'Saldo dompet sumber tidak mencukupi.' : 'Insufficient source wallet balance.'),
                                 backgroundColor: AppTheme.coralRose,
                               ),
                             );
@@ -339,7 +341,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
                           navigator.pop();
                           messenger.showSnackBar(
                             SnackBar(
-                              content: Text('Berhasil menabung ${_currencyFormat.format(amount)}!'),
+                              content: Text(widget.localeService?.isIndonesian == true ? 'Berhasil menabung ${_currencyFormat.format(amount)}!' : 'Successfully deposited ${_currencyFormat.format(amount)}!'),
                               backgroundColor: AppTheme.emeraldGreen,
                             ),
                           );
@@ -349,7 +351,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
                           foregroundColor: Colors.black,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                         ),
-                        child: const Text('Simpan ke Tabungan', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+                        child: Text(t('saveToPocket'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
                       ),
                     ),
                   ],
@@ -415,13 +417,13 @@ class _SavingsScreenState extends State<SavingsScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    const Row(
+                    Row(
                       children: [
-                        Icon(Icons.arrow_upward_rounded, color: AppTheme.coralRose, size: 22),
-                        SizedBox(width: 8),
+                        const Icon(Icons.arrow_upward_rounded, color: AppTheme.coralRose, size: 22),
+                        const SizedBox(width: 8),
                         Text(
-                          'Tarik Dana Tabungan (Keluar)',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.textPrimary),
+                          t('withdrawTitle'),
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.textPrimary),
                         ),
                       ],
                     ),
@@ -431,9 +433,9 @@ class _SavingsScreenState extends State<SavingsScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Dari Kantong Tabungan:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+                        Text(t('sourcePocketLabel'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
                         Text(
-                          'Tersedia: ${_currencyFormat.format(activePocket.currentAmount)}',
+                          '${t('available')}: ${_currencyFormat.format(activePocket.currentAmount)}',
                           style: const TextStyle(fontSize: 11, color: AppTheme.emeraldGreen, fontWeight: FontWeight.w600),
                         ),
                       ],
@@ -466,7 +468,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
                     const SizedBox(height: 14),
 
                     // Pilih Dompet Penerima
-                    const Text('Kirim ke Dompet / Rekening:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+                    Text(t('destWalletLabel'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
                     const SizedBox(height: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -495,7 +497,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
                     const SizedBox(height: 14),
 
                     // Nominal Input
-                    const Text('Nominal Penarikan (Rp):', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+                    Text(t('nominal'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
                     const SizedBox(height: 6),
                     TextField(
                       controller: amountCtrl,
@@ -513,13 +515,13 @@ class _SavingsScreenState extends State<SavingsScreen> {
                     const SizedBox(height: 14),
 
                     // Catatan
-                    const Text('Keterangan Keperluan:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+                    Text(t('noteOptional'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
                     const SizedBox(height: 6),
                     TextField(
                       controller: noteCtrl,
                       style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
                       decoration: InputDecoration(
-                        hintText: 'Contoh: Biaya darurat atau servis',
+                        hintText: widget.localeService?.isIndonesian == true ? 'Contoh: Biaya darurat atau servis' : 'e.g. Emergency expense',
                         filled: true,
                         fillColor: AppTheme.surfaceLighter,
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppTheme.borderDark)),
@@ -539,8 +541,8 @@ class _SavingsScreenState extends State<SavingsScreen> {
 
                           if (amount > activePocket.currentAmount) {
                             ScaffoldMessenger.of(modalCtx).showSnackBar(
-                              const SnackBar(
-                                content: Text('Saldo tabungan tidak mencukupi untuk ditarik.'),
+                              SnackBar(
+                                content: Text(widget.localeService?.isIndonesian == true ? 'Saldo tabungan tidak mencukupi untuk ditarik.' : 'Insufficient savings balance to withdraw.'),
                                 backgroundColor: AppTheme.coralRose,
                               ),
                             );
@@ -564,7 +566,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
                           navigator.pop();
                           messenger.showSnackBar(
                             SnackBar(
-                              content: Text('Berhasil menarik ${_currencyFormat.format(amount)} ke dompet!'),
+                              content: Text(widget.localeService?.isIndonesian == true ? 'Berhasil menarik ${_currencyFormat.format(amount)} ke dompet!' : 'Successfully withdrew ${_currencyFormat.format(amount)} to wallet!'),
                               backgroundColor: AppTheme.coralRose,
                             ),
                           );
@@ -574,7 +576,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                         ),
-                        child: const Text('Tarik Dana ke Dompet', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+                        child: Text(t('withdrawFromPocket'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
                       ),
                     ),
                   ],
@@ -614,22 +616,22 @@ class _SavingsScreenState extends State<SavingsScreen> {
                 borderRadius: BorderRadius.circular(20),
                 side: const BorderSide(color: AppTheme.borderDark),
               ),
-              title: const Text(
-                'Buat Kantong Tabungan Baru',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+              title: Text(
+                t('createPocketTitle'),
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
               ),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Nama Tujuan / Celengan:', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                    Text(t('pocketNameLabel'), style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
                     const SizedBox(height: 6),
                     TextField(
                       controller: nameCtrl,
                       style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
                       decoration: InputDecoration(
-                        hintText: 'Contoh: Beli Motor, DP Rumah, Umroh',
+                        hintText: t('pocketNameHint'),
                         filled: true,
                         fillColor: AppTheme.surfaceLighter,
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.borderDark)),
@@ -637,7 +639,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    const Text('Target Nominal (Rp):', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                    Text(t('targetAmountLabel'), style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
                     const SizedBox(height: 6),
                     TextField(
                       controller: targetCtrl,
@@ -645,7 +647,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
                       style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14, fontWeight: FontWeight.w700),
                       decoration: InputDecoration(
                         prefixText: 'Rp ',
-                        hintText: '0 (jika tanpa target tetap)',
+                        hintText: widget.localeService?.isIndonesian == true ? '0 (jika tanpa target tetap)' : '0 (optional)',
                         filled: true,
                         fillColor: AppTheme.surfaceLighter,
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.borderDark)),
@@ -653,13 +655,13 @@ class _SavingsScreenState extends State<SavingsScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    const Text('Catatan Motivasi (Opsional):', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                    Text(t('noteOptional'), style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
                     const SizedBox(height: 6),
                     TextField(
                       controller: noteCtrl,
                       style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
                       decoration: InputDecoration(
-                        hintText: 'Contoh: Target tercapai sebelum akhir tahun',
+                        hintText: widget.localeService?.isIndonesian == true ? 'Contoh: Target tercapai sebelum akhir tahun' : 'e.g. Target reached before year end',
                         filled: true,
                         fillColor: AppTheme.surfaceLighter,
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.borderDark)),
@@ -667,7 +669,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
                       ),
                     ),
                     const SizedBox(height: 14),
-                    const Text('Pilih Aksen Warna:', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                    Text(t('pocketColorLabel'), style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
                     const SizedBox(height: 8),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -699,7 +701,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(dialogCtx),
-                  child: const Text('Batal', style: TextStyle(color: AppTheme.textMuted)),
+                  child: Text(t('cancel'), style: const TextStyle(color: AppTheme.textMuted)),
                 ),
                 ElevatedButton(
                   onPressed: () async {
@@ -729,7 +731,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
                     backgroundColor: AppTheme.emeraldGreen,
                     foregroundColor: Colors.black,
                   ),
-                  child: const Text('Buat Kantong', style: TextStyle(fontWeight: FontWeight.w700)),
+                  child: Text(t('save'), style: const TextStyle(fontWeight: FontWeight.w700)),
                 ),
               ],
             );
@@ -955,14 +957,12 @@ class _SavingsScreenState extends State<SavingsScreen> {
                     children: [
                       const Icon(Icons.savings_outlined, size: 40, color: AppTheme.textMuted),
                       const SizedBox(height: 8),
-                      const Text('Belum ada kantong tabungan', style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 4),
-                      const Text('Buat target tabungan seperti Dana Darurat atau Liburan.', style: TextStyle(color: AppTheme.textMuted, fontSize: 11), textAlign: TextAlign.center),
+                      Text(t('noPocketsYet'), style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13, fontWeight: FontWeight.w600), textAlign: TextAlign.center),
                       const SizedBox(height: 12),
                       ElevatedButton(
                         onPressed: _showCreatePocketDialog,
                         style: ElevatedButton.styleFrom(backgroundColor: AppTheme.cyanAccent, foregroundColor: Colors.black),
-                        child: const Text('Buat Kantong Tabungan', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                        child: Text(t('newPocket'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
                       ),
                     ],
                   ),
@@ -1031,7 +1031,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
-                                  isDone ? 'Tercapai! 🎉' : '$percent%',
+                                  isDone ? (widget.localeService?.isIndonesian == true ? 'Tercapai! 🎉' : 'Achieved! 🎉') : '$percent%',
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w800,
@@ -1053,7 +1053,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
                               ),
                               if (p.targetAmount > 0)
                                 Text(
-                                  'Target: ${_currencyFormat.format(p.targetAmount)}',
+                                  '${t('target')}: ${_currencyFormat.format(p.targetAmount)}',
                                   style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
                                 ),
                             ],
@@ -1074,7 +1074,9 @@ class _SavingsScreenState extends State<SavingsScreen> {
                             const SizedBox(height: 6),
                             if (!isDone)
                               Text(
-                                'Kurang ${_currencyFormat.format(p.remainingAmount)} lagi untuk mencapai target.',
+                                widget.localeService?.isIndonesian == true
+                                    ? 'Kurang ${_currencyFormat.format(p.remainingAmount)} lagi untuk mencapai target.'
+                                    : '${_currencyFormat.format(p.remainingAmount)} left to reach target.',
                                 style: const TextStyle(fontSize: 10, color: AppTheme.textSecondary),
                               ),
                           ],
@@ -1086,7 +1088,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
                             children: [
                               IconButton(
                                 icon: const Icon(Icons.delete_outline, size: 18, color: AppTheme.coralRose),
-                                tooltip: 'Hapus Pos Tabungan',
+                                tooltip: t('deletePocketBtn'),
                                 padding: EdgeInsets.zero,
                                 constraints: const BoxConstraints(),
                                 onPressed: () => _confirmDeletePocket(p),
@@ -1096,7 +1098,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
                                   OutlinedButton.icon(
                                     onPressed: () => _showWithdrawModal(preselectedPocket: p),
                                     icon: const Icon(Icons.remove, size: 14),
-                                    label: const Text('Tarik', style: TextStyle(fontSize: 11)),
+                                    label: Text(t('withdraw'), style: const TextStyle(fontSize: 11)),
                                     style: OutlinedButton.styleFrom(
                                       foregroundColor: AppTheme.coralRose,
                                       side: const BorderSide(color: AppTheme.borderDark),
@@ -1109,7 +1111,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
                                   ElevatedButton.icon(
                                     onPressed: () => _showDepositModal(preselectedPocket: p),
                                     icon: const Icon(Icons.add, size: 14),
-                                    label: const Text('Nabung', style: TextStyle(fontSize: 11)),
+                                    label: Text(t('deposit'), style: const TextStyle(fontSize: 11)),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: color,
                                       foregroundColor: Colors.black,
@@ -1133,17 +1135,17 @@ class _SavingsScreenState extends State<SavingsScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'RIWAYAT TABUNGAN',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.5, color: AppTheme.textSecondary),
+                  Text(
+                    t('secSavingsHistory'),
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.5, color: AppTheme.textSecondary),
                   ),
                   Row(
                     children: [
-                      _buildFilterChip('all', 'Semua'),
+                      _buildFilterChip('all', t('allFilter')),
                       const SizedBox(width: 4),
-                      _buildFilterChip('in', 'Masuk'),
+                      _buildFilterChip('in', t('inFilter')),
                       const SizedBox(width: 4),
-                      _buildFilterChip('out', 'Keluar'),
+                      _buildFilterChip('out', t('outFilter')),
                     ],
                   ),
                 ],
@@ -1159,8 +1161,8 @@ class _SavingsScreenState extends State<SavingsScreen> {
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: AppTheme.borderDark),
                   ),
-                  child: const Center(
-                    child: Text('Belum ada riwayat mutasi tabungan.', style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+                  child: Center(
+                    child: Text(t('noSavingsHistory'), style: const TextStyle(fontSize: 12, color: AppTheme.textMuted)),
                   ),
                 )
               else
@@ -1211,7 +1213,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
-                                        '${r.pocketName} • ${r.walletName} • ${DateFormat('dd MMM yyyy', 'id_ID').format(r.date)}',
+                                        '${r.pocketName} • ${r.walletName} • ${DateFormat('dd MMM yyyy', widget.localeService?.isIndonesian == true ? 'id_ID' : 'en_US').format(r.date)}',
                                         style: const TextStyle(fontSize: 10, color: AppTheme.textMuted),
                                         overflow: TextOverflow.ellipsis,
                                       ),

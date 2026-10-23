@@ -33,6 +33,13 @@ class _LoginScreenState extends State<LoginScreen> {
   void initState() {
     super.initState();
     _errorMessage = widget.initialErrorMessage;
+    _rememberMe = widget.authService.isRememberMe();
+    if (_rememberMe) {
+      final saved = widget.authService.getSavedUsername();
+      if (saved != null && saved.isNotEmpty) {
+        _usernameController.text = saved;
+      }
+    }
   }
 
   @override
@@ -245,7 +252,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 12),
 
-                      // Ingat Saya (Tanpa tombol default)
+                      // Ingat Saya (Menyimpan username saja, password wajib ketik manual)
                       Row(
                         children: [
                           SizedBox(
@@ -257,11 +264,22 @@ class _LoginScreenState extends State<LoginScreen> {
                               checkColor: Colors.black,
                               side: const BorderSide(color: AppTheme.borderDark),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                              onChanged: (val) => setState(() => _rememberMe = val ?? true),
+                              onChanged: (val) {
+                                final isChecked = val ?? true;
+                                setState(() => _rememberMe = isChecked);
+                                widget.authService.setRememberMe(isChecked);
+                              },
                             ),
                           ),
                           const SizedBox(width: 8),
-                          Text(t('rememberMe'), style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                          GestureDetector(
+                            onTap: () {
+                              final isChecked = !_rememberMe;
+                              setState(() => _rememberMe = isChecked);
+                              widget.authService.setRememberMe(isChecked);
+                            },
+                            child: Text(t('rememberMe'), style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 24),

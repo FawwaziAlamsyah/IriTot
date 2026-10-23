@@ -10,7 +10,6 @@ import '../services/ai_service.dart';
 import '../theme/app_theme.dart';
 import 'add_transaction_modal.dart';
 import 'budget_screen.dart';
-import 'savings_screen.dart';
 import '../services/locale_service.dart';
 import '../services/auth_service.dart';
 
@@ -111,11 +110,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           borderRadius: BorderRadius.circular(20),
           side: const BorderSide(color: AppTheme.borderDark),
         ),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.delete_outline, color: AppTheme.coralRose, size: 22),
-            SizedBox(width: 8),
-            Text('Hapus Transaksi', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+            const Icon(Icons.delete_outline, color: AppTheme.coralRose, size: 22),
+            const SizedBox(width: 8),
+            Text(
+              widget.localeService?.t('deleteTransactionTitle') ?? 'Delete Transaction',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+            ),
           ],
         ),
         content: Text(
@@ -243,17 +245,20 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (ctx) => const Center(
+        builder: (ctx) => Center(
           child: Card(
             color: AppTheme.surfaceDark,
             child: Padding(
-              padding: EdgeInsets.all(24),
+              padding: const EdgeInsets.all(24),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  CircularProgressIndicator(color: AppTheme.cyanAccent),
-                  SizedBox(height: 16),
-                  Text('Memindai struk dengan AI...', style: TextStyle(color: AppTheme.textPrimary, fontSize: 14)),
+                  const CircularProgressIndicator(color: AppTheme.cyanAccent),
+                  const SizedBox(height: 16),
+                  Text(
+                    widget.localeService?.t('scanningReceipt') ?? 'AI is analyzing your receipt...',
+                    style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14),
+                  ),
                 ],
               ),
             ),
@@ -499,8 +504,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   dividerColor: AppTheme.borderDark,
                   dividerHeight: 1.0,
                   tabs: [
-                    Tab(text: widget.localeService?.t('tabDailySpending') ?? 'Savings'),
-                    Tab(text: widget.localeService?.t('tabSavings') ?? 'Pocket'),
+                    Tab(text: widget.localeService?.t('tabDailySpending') ?? 'Spending'),
+                    Tab(text: widget.localeService?.t('tabBudget') ?? 'Budget'),
                   ],
                 ),
               ),
@@ -511,7 +516,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               child: TabBarView(
                 controller: _tabController,
                 children: [
-                  // Page 1: Pemakaian Sehari-hari
+                  // Page 1: Spending (Pemakaian Sehari-hari)
                   _buildDailySpendingPage(
                     now: now,
                     totalBalance: totalBalance,
@@ -524,8 +529,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     catMap: catMap,
                     walletMap: walletMap,
                   ),
-                  // Page 2: Tabungan
-                  SavingsScreen(
+                  // Page 2: Budget (Pantauan Anggaran)
+                  BudgetScreen(
                     storageService: widget.storageService,
                     localeService: widget.localeService,
                     onDataChanged: () {
@@ -533,7 +538,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       widget.onDataChanged();
                     },
                     showAppBar: false,
-                    isBalanceHidden: _isBalanceHidden,
                   ),
                 ],
               ),
@@ -810,7 +814,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               const SizedBox(width: 8),
               _buildActionButton(
                 icon: Icons.swap_horiz,
-                label: 'Transfer',
+                label: widget.localeService?.t('transfer') ?? 'Transfer',
                 color: AppTheme.amberWarning,
                 onTap: () => _openAddModal(initialType: 'transfer'),
               ),
@@ -833,15 +837,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               ),
               TextButton(
                 onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => BudgetScreen(
-                        storageService: widget.storageService,
-                        onDataChanged: widget.onDataChanged,
-                      ),
-                    ),
-                  );
+                  _tabController.animateTo(1);
                 },
                 style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
                 child: Text(widget.localeService?.t('seeAll') ?? 'See All', style: const TextStyle(fontSize: 12, color: AppTheme.cyanAccent)),
@@ -996,14 +992,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                t.note.trim().isEmpty ? (cat?.name ?? 'Transaksi') : t.note,
+                                t.note.trim().isEmpty ? (cat?.name ?? (widget.localeService?.isIndonesian == true ? 'Transaksi' : 'Transaction')) : t.note,
                                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                '${cat?.name ?? 'Umum'} • ${wallet?.name ?? 'Kas'} • ${DateFormat('dd MMM', 'id_ID').format(t.date)}',
+                                '${cat?.name ?? (widget.localeService?.isIndonesian == true ? 'Umum' : 'General')} • ${wallet?.name ?? (widget.localeService?.isIndonesian == true ? 'Kas' : 'Cash')} • ${DateFormat('dd MMM', widget.localeService?.isIndonesian == true ? 'id_ID' : 'en_US').format(t.date)}',
                                 style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -1093,9 +1089,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppTheme.borderDark),
         ),
-        child: const Text(
-          'Belum ada anggaran bulanan yang disetel. Buka tab Anggaran untuk menyetel batas belanja.',
-          style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+        child: Text(
+          widget.localeService?.t('noBudgetSet') ?? 'No monthly budgets set yet. Tap Budget tab to set spending limits.',
+          style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
         ),
       );
     }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 
 class AppTheme {
   // Sleek Neo-Fintech Color Palette
@@ -23,6 +24,16 @@ class AppTheme {
     return ThemeData(
       brightness: Brightness.dark,
       scaffoldBackgroundColor: bgDark,
+      canvasColor: bgDark,
+      cardColor: surfaceDark,
+      dialogTheme: const DialogThemeData(backgroundColor: surfaceDark),
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: ZoomPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+        },
+      ),
       primaryColor: emeraldGreen,
       colorScheme: const ColorScheme.dark(
         primary: emeraldGreen,

@@ -8,6 +8,7 @@ import 'package:iritot/services/ai_service.dart';
 import 'package:iritot/services/auth_service.dart';
 import 'package:iritot/services/locale_service.dart';
 import 'package:iritot/screens/splash_screen.dart';
+import 'package:iritot/screens/login_screen.dart';
 
 void main() {
   testWidgets('IriTot Login flow and Savings navigation smoke test', (WidgetTester tester) async {
@@ -46,14 +47,15 @@ void main() {
     // 4. Verify Home Screen elements after successful login
     expect(find.text('IRITOT'), findsOneWidget);
     expect(find.text('PERSONAL'), findsOneWidget);
-    expect(find.text('Savings'), findsOneWidget);
+    expect(find.text('Spending'), findsOneWidget);
+    expect(find.text('Budget'), findsOneWidget);
     expect(find.text('TOTAL CASH BALANCE'), findsOneWidget);
     expect(find.text('Monthly'), findsOneWidget);
     expect(find.text('SAVINGS & POCKETS'), findsNothing);
 
-    // 5. Verify Pocket tab item exists and tap it
-    expect(find.text('Pocket'), findsNWidgets(2));
-    await tester.tap(find.text('Pocket').first);
+    // 5. Verify Pocket tab item exists in bottom nav and tap it
+    expect(find.text('Pocket'), findsOneWidget);
+    await tester.tap(find.text('Pocket'));
     await tester.pumpAndSettle();
 
     // 6. Verify Savings Screen elements in English
@@ -142,6 +144,67 @@ void main() {
     // Test logout
     await authService.logout();
     expect(authService.isLoggedIn(), false);
+  });
+
+  test('AuthService Remember Me saves username only, password is never saved', () async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    SharedPreferences.setMockInitialValues({});
+
+    final authService = await AuthService.init();
+    expect(authService.isRememberMe(), true);
+    expect(authService.getSavedUsername(), 'NewUser');
+
+    // Login with rememberMe: true
+    await authService.login('NewUser', 'iritot123', rememberMe: true);
+    expect(authService.getSavedUsername(), 'NewUser');
+
+    // Update username in profile
+    await authService.updateProfile(newDisplayName: 'Aji', newUsername: 'aji_finance');
+    expect(authService.getSavedUsername(), 'aji_finance');
+
+    // Logout
+    await authService.logout();
+    expect(authService.isLoggedIn(), false);
+    // Remembered username is still preserved after logout
+    expect(authService.getSavedUsername(), 'aji_finance');
+
+    // Login with rememberMe: false
+    await authService.login('aji_finance', 'iritot123', rememberMe: false);
+    expect(authService.isRememberMe(), false);
+    expect(authService.getSavedUsername(), null);
+
+    // Logout
+    await authService.logout();
+    expect(authService.getSavedUsername(), null);
+  });
+
+  testWidgets('LoginScreen pre-fills remembered username and leaves password empty', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'iritot_auth_remember_me': true,
+      'iritot_auth_saved_username': 'myuser',
+    });
+    final authService = await AuthService.init();
+    final localeService = await LocaleService.init();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: LoginScreen(
+          authService: authService,
+          localeService: localeService,
+          onLoginSuccess: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Verify username TextField has 'myuser'
+    final usernameFinder = find.widgetWithText(TextField, 'myuser');
+    expect(usernameFinder, findsOneWidget);
+
+    // Verify password field is completely empty
+    final passwordFields = tester.widgetList<TextField>(find.byType(TextField)).where((tf) => tf.obscureText);
+    expect(passwordFields.length, 1);
+    expect(passwordFields.first.controller?.text, '');
   });
 
   test('LocaleService default English and language switching test', () async {

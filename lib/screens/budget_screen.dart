@@ -2,16 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/category.dart';
 import '../services/storage_service.dart';
+import '../services/locale_service.dart';
 import '../theme/app_theme.dart';
 
 class BudgetScreen extends StatefulWidget {
   final StorageService storageService;
+  final LocaleService? localeService;
   final VoidCallback onDataChanged;
+  final bool showAppBar;
 
   const BudgetScreen({
     super.key,
     required this.storageService,
+    this.localeService,
     required this.onDataChanged,
+    this.showAppBar = true,
   });
 
   @override
@@ -24,6 +29,8 @@ class _BudgetScreenState extends State<BudgetScreen> {
     symbol: 'Rp ',
     decimalDigits: 0,
   );
+
+  String t(String key) => widget.localeService?.t(key) ?? key;
 
   void _showSetBudgetDialog(CategoryItem category, double currentLimit) {
     final controller = TextEditingController(
@@ -40,14 +47,14 @@ class _BudgetScreenState extends State<BudgetScreen> {
             side: const BorderSide(color: AppTheme.borderDark),
           ),
           title: Text(
-            'Atur Budget: ${category.name}',
+            '${t('setBudget')}: ${category.name}',
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Masukkan batas pengeluaran bulanan (Rp):', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+              Text(t('enterMonthlyLimit'), style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
               const SizedBox(height: 10),
               TextField(
                 controller: controller,
@@ -77,11 +84,11 @@ class _BudgetScreenState extends State<BudgetScreen> {
                   }
                   navigator.pop();
                 },
-                child: const Text('Hapus Anggaran', style: TextStyle(color: AppTheme.coralRose, fontWeight: FontWeight.w600)),
+                child: Text(t('deleteBudget'), style: const TextStyle(color: AppTheme.coralRose, fontWeight: FontWeight.w600)),
               ),
             TextButton(
               onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Batal', style: TextStyle(color: AppTheme.textMuted)),
+              child: Text(t('cancel'), style: const TextStyle(color: AppTheme.textMuted)),
             ),
             ElevatedButton(
               onPressed: () async {
@@ -103,7 +110,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
                 backgroundColor: AppTheme.emeraldGreen,
                 foregroundColor: Colors.black,
               ),
-              child: const Text('Simpan', style: TextStyle(fontWeight: FontWeight.w700)),
+              child: Text(t('save'), style: const TextStyle(fontWeight: FontWeight.w700)),
             ),
           ],
         );
@@ -135,193 +142,210 @@ class _BudgetScreenState extends State<BudgetScreen> {
     final overallRatio = totalBudget > 0 ? (totalSpent / totalBudget).clamp(0.0, 1.0) : 0.0;
     final overallPercent = totalBudget > 0 ? ((totalSpent / totalBudget) * 100).toInt() : 0;
 
-    return Scaffold(
-      backgroundColor: AppTheme.bgDark,
-      appBar: AppBar(
-        title: const Text('Pantauan Anggaran'),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Overall Card
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF1B2335), Color(0xFF131B2A)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(color: AppTheme.borderDark),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    final body = SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Overall Card
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF1B2335), Color(0xFF131B2A)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: AppTheme.borderDark),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'TOTAL ANGGARAN BULAN INI',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.textMuted, letterSpacing: 0.8),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: overallPercent >= 80 ? AppTheme.coralRose.withValues(alpha: 0.2) : AppTheme.emeraldGreen.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            '$overallPercent% Terpakai',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: overallPercent >= 80 ? AppTheme.coralRose : AppTheme.emeraldGreen,
-                            ),
-                          ),
-                        ),
-                      ],
+                    Text(
+                      t('totalBudgetThisMonth'),
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.textMuted, letterSpacing: 0.8),
                     ),
-                    const SizedBox(height: 10),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
-                      textBaseline: TextBaseline.alphabetic,
-                      children: [
-                        Text(
-                          _currencyFormat.format(totalSpent),
-                          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: AppTheme.textPrimary),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: overallPercent >= 80 ? AppTheme.coralRose.withValues(alpha: 0.2) : AppTheme.emeraldGreen.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '$overallPercent% ${t('used')}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: overallPercent >= 80 ? AppTheme.coralRose : AppTheme.emeraldGreen,
                         ),
-                        const SizedBox(width: 6),
-                        Text(
-                          '/ ${_currencyFormat.format(totalBudget)}',
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textMuted),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(5),
-                      child: LinearProgressIndicator(
-                        value: overallRatio,
-                        backgroundColor: AppTheme.surfaceLighter,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          overallPercent >= 80 ? AppTheme.coralRose : AppTheme.emeraldGreen,
-                        ),
-                        minHeight: 8,
                       ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 24),
-
-              const Text(
-                'RINCIAN PER KATEGORI',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.5, color: AppTheme.textSecondary),
-              ),
-              const SizedBox(height: 10),
-
-              ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: categories.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 10),
-                itemBuilder: (context, index) {
-                  final cat = categories[index];
-                  final limit = budgetMap[cat.id] ?? 0.0;
-                  final spent = transactions.where((t) => t.categoryId == cat.id).fold(0.0, (sum, t) => sum + t.amount);
-                  final ratio = limit > 0 ? (spent / limit).clamp(0.0, 1.0) : 0.0;
-                  final percent = limit > 0 ? ((spent / limit) * 100).toInt() : 0;
-                  final isWarning = percent >= 80;
-
-                  return GestureDetector(
-                    onTap: () => _showSetBudgetDialog(cat, limit),
-                    child: Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: AppTheme.surfaceDark,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppTheme.borderDark),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: BoxDecoration(
-                                      color: Color(cat.colorValue),
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    cat.name,
-                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
-                                  ),
-                                ],
-                              ),
-                              Row(
-                                children: [
-                                  Text(
-                                    limit > 0 ? '$percent%' : 'Belum Disetel',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                      color: limit > 0 ? (isWarning ? AppTheme.coralRose : AppTheme.emeraldGreen) : AppTheme.textMuted,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  const Icon(Icons.chevron_right, size: 16, color: AppTheme.textMuted),
-                                ],
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Terpakai: ${_currencyFormat.format(spent)}',
-                                style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
-                              ),
-                              Text(
-                                'Batas: ${_currencyFormat.format(limit)}',
-                                style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(3),
-                            child: LinearProgressIndicator(
-                              value: ratio,
-                              backgroundColor: AppTheme.surfaceLighter,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                isWarning ? AppTheme.coralRose : Color(cat.colorValue),
-                              ),
-                              minHeight: 5,
-                            ),
-                          ),
-                        ],
-                      ),
+                const SizedBox(height: 10),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text(
+                      _currencyFormat.format(totalSpent),
+                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: AppTheme.textPrimary),
                     ),
-                  );
-                },
-              ),
-              const SizedBox(height: 24),
-            ],
+                    const SizedBox(width: 6),
+                    Text(
+                      '/ ${_currencyFormat.format(totalBudget)}',
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textMuted),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(5),
+                  child: LinearProgressIndicator(
+                    value: overallRatio,
+                    backgroundColor: AppTheme.surfaceLighter,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      overallPercent >= 80 ? AppTheme.coralRose : AppTheme.emeraldGreen,
+                    ),
+                    minHeight: 8,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
+          const SizedBox(height: 24),
+
+          Text(
+            t('categoryBreakdown'),
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.5, color: AppTheme.textSecondary),
+          ),
+          const SizedBox(height: 10),
+
+          if (categories.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceDark,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppTheme.borderDark),
+              ),
+              child: Center(
+                child: Text(t('noBudgetSet'), style: const TextStyle(color: AppTheme.textMuted, fontSize: 13)),
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: categories.length,
+              separatorBuilder: (context, index) => const SizedBox(height: 10),
+              itemBuilder: (context, index) {
+                final cat = categories[index];
+                final limit = budgetMap[cat.id] ?? 0.0;
+                final spent = transactions.where((t) => t.categoryId == cat.id).fold(0.0, (sum, t) => sum + t.amount);
+                final ratio = limit > 0 ? (spent / limit).clamp(0.0, 1.0) : 0.0;
+                final percent = limit > 0 ? ((spent / limit) * 100).toInt() : 0;
+                final isWarning = percent >= 80;
+
+                return GestureDetector(
+                  onTap: () => _showSetBudgetDialog(cat, limit),
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surfaceDark,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppTheme.borderDark),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    color: Color(cat.colorValue),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  cat.name,
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+                                ),
+                              ],
+                            ),
+                            Row(
+                              children: [
+                                Text(
+                                  limit > 0 ? '$percent%' : t('notSet'),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: limit > 0 ? (isWarning ? AppTheme.coralRose : AppTheme.emeraldGreen) : AppTheme.textMuted,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                const Icon(Icons.chevron_right, size: 16, color: AppTheme.textMuted),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '${t('spent')}: ${_currencyFormat.format(spent)}',
+                              style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                            ),
+                            Text(
+                              '${t('limit')}: ${_currencyFormat.format(limit)}',
+                              style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(3),
+                          child: LinearProgressIndicator(
+                            value: ratio,
+                            backgroundColor: AppTheme.surfaceLighter,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              isWarning ? AppTheme.coralRose : Color(cat.colorValue),
+                            ),
+                            minHeight: 5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          const SizedBox(height: 24),
+        ],
       ),
+    );
+
+    if (!widget.showAppBar) {
+      return body;
+    }
+
+    return Scaffold(
+      backgroundColor: AppTheme.bgDark,
+      appBar: AppBar(
+        title: Text(t('budgetMonitoring')),
+      ),
+      body: SafeArea(child: body),
     );
   }
 }

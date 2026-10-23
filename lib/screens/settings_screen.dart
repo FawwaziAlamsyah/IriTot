@@ -41,6 +41,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _categoryFilter = 'all'; // 'all', 'expense', 'income'
   bool _showAllCategories = false;
 
+  String t(String key) => widget.localeService.t(key);
+
   @override
   void initState() {
     super.initState();
@@ -91,7 +93,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     controller: nameCtrl,
                     style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14),
                     decoration: InputDecoration(
-                      hintText: 'Contoh: Bank Jago, Dana, dll.',
+                      hintText: t('walletNameHint'),
                       hintStyle: TextStyle(color: AppTheme.textMuted.withValues(alpha: 0.7), fontSize: 12),
                       filled: true,
                       fillColor: AppTheme.surfaceLighter,
@@ -100,7 +102,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  const Text('Saldo Awal (Rp):', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                  Text(t('initialBalanceLabel'), style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
                   const SizedBox(height: 6),
                   TextField(
                     controller: balanceCtrl,
@@ -115,13 +117,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  const Text('Tipe Dompet:', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                  Text(t('walletTypeLabel'), style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      _buildTypeRadio('cash', 'Tunai', type, (val) => setDialogState(() => type = val)),
-                      _buildTypeRadio('bank', 'Bank', type, (val) => setDialogState(() => type = val)),
-                      _buildTypeRadio('ewallet', 'E-Wallet', type, (val) => setDialogState(() => type = val)),
+                      _buildTypeRadio('cash', t('typeCash'), type, (val) => setDialogState(() => type = val)),
+                      _buildTypeRadio('bank', t('typeBank'), type, (val) => setDialogState(() => type = val)),
+                      _buildTypeRadio('ewallet', t('typeEWallet'), type, (val) => setDialogState(() => type = val)),
                     ],
                   ),
                 ],
@@ -129,7 +131,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(dialogContext),
-                  child: const Text('Batal', style: TextStyle(color: AppTheme.textMuted)),
+                  child: Text(t('cancel'), style: const TextStyle(color: AppTheme.textMuted)),
                 ),
                 ElevatedButton(
                   onPressed: () async {
@@ -153,7 +155,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     navigator.pop();
                   },
                   style: ElevatedButton.styleFrom(backgroundColor: AppTheme.emeraldGreen, foregroundColor: Colors.black),
-                  child: const Text('Tambah', style: TextStyle(fontWeight: FontWeight.w700)),
+                  child: Text(t('add'), style: const TextStyle(fontWeight: FontWeight.w700)),
                 ),
               ],
             );
@@ -304,7 +306,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ],
                   ),
                   const SizedBox(height: 14),
-                  const Text('Pilih Warna:', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                  Text(t('pocketColorLabel'), style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
