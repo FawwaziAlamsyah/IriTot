@@ -267,6 +267,36 @@ void main() {
     expect(receiptRes.containsKey('amount'), isTrue);
   });
 
+  test('Voice parser syncs with the user categories and wallets when spoken', () async {
+    final ai = await AiService.init();
+    final storage = await StorageService.init();
+    await storage.addCategory(CategoryItem(
+      id: 'cat_gym',
+      name: 'Gym & Fitness',
+      type: 'expense',
+      icon: 'fitness_center',
+      colorValue: 0xFFF43F5E,
+    ));
+    await storage.addWallet(Wallet(
+      id: 'w_blu',
+      name: 'Blu',
+      type: 'bank',
+      balance: 0,
+      icon: 'account_balance',
+      colorValue: 0xFF38BDF8,
+    ));
+
+    final parsed = ai.parseOfflineVoiceOrText(
+      'bayar membership gym 150 ribu pakai blu',
+      categories: storage.getCategories(),
+      wallets: storage.getWallets(),
+    );
+    expect(parsed['categoryId'], 'cat_gym');
+    expect(parsed['walletId'], 'w_blu');
+    expect(parsed['amount'], 150000);
+    expect(parsed['type'], 'expense');
+  });
+
   test('CsvService and StorageService savings/pocket CSV cycle', () async {
     final storage = await StorageService.init();
 

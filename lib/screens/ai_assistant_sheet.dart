@@ -7,6 +7,7 @@ import '../services/locale_service.dart';
 import '../services/speech_service.dart';
 import '../models/transaction_item.dart';
 import '../theme/app_theme.dart';
+import '../widgets/voice_wave.dart';
 
 class AiAssistantSheet extends StatefulWidget {
   final StorageService storageService;
@@ -72,25 +73,35 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
     super.dispose();
   }
 
+  bool _voiceCancelled = false;
+
+  /// Runs once when listening ends; the full sentence is sent to the assistant.
+  void _finishVoice() {
+    if (!_isVoiceRecording || !mounted) return;
+    setState(() => _isVoiceRecording = false);
+    if (_voiceCancelled) return;
+    final text = _promptController.text.trim();
+    if (text.isNotEmpty) _sendMessage(text);
+  }
+
   void _toggleVoice() async {
     if (_isVoiceRecording) {
+      // Tap again = finish now and process what was said
       SpeechService.instance.stopListening();
-      setState(() => _isVoiceRecording = false);
+      _finishVoice();
       return;
     }
 
+    _voiceCancelled = false;
+    _promptController.clear();
     setState(() => _isVoiceRecording = true);
 
     final started = await SpeechService.instance.startListening(
       onResult: (text) {
         if (!mounted) return;
-        setState(() {
-          _promptController.text = text;
-        });
+        setState(() => _promptController.text = text);
       },
-      onEnd: () {
-        if (mounted) setState(() => _isVoiceRecording = false);
-      },
+      onEnd: _finishVoice,
       onError: (err) {
         if (mounted) {
           setState(() => _isVoiceRecording = false);
@@ -109,7 +120,6 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
       setState(() => _isVoiceRecording = false);
     }
   }
-
   void _sendMessage(String query) async {
     final clean = query.trim();
     if (clean.isEmpty) return;
@@ -489,9 +499,13 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
                 // Mic Button
                 IconButton(
                   tooltip: t('actionVoice'),
-                  icon: Icon(
-                    _isVoiceRecording ? Icons.mic : Icons.mic_none,
-                    color: _isVoiceRecording ? AppTheme.coralRose : AppTheme.violetAI,
+                  icon: PulsingMic(
+                    active: _isVoiceRecording,
+                    color: AppTheme.coralRose,
+                    child: Icon(
+                      _isVoiceRecording ? Icons.mic : Icons.mic_none,
+                      color: _isVoiceRecording ? AppTheme.coralRose : AppTheme.violetAI,
+                    ),
                   ),
                   onPressed: _toggleVoice,
                 ),
@@ -502,6 +516,13 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
                     controller: _promptController,
                     style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
                     decoration: InputDecoration(
+                      prefixIcon: _isVoiceRecording
+                          ? const Padding(
+                              padding: EdgeInsets.only(left: 12, right: 4),
+                              child: VoiceWave(color: AppTheme.coralRose, height: 18, bars: 4),
+                            )
+                          : null,
+                      prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
                       hintText: _isVoiceRecording
                           ? (widget.localeService?.isIndonesian ?? true ? 'Mendengarkan suara...' : 'Listening...')
                           : (widget.localeService?.isIndonesian ?? true ? 'Tanya atau catat transaksi...' : 'Ask or log transaction...'),

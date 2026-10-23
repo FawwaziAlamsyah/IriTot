@@ -64,6 +64,9 @@ class AuthService {
     return _prefs.getString(_keyPassword) ?? defaultPassword;
   }
 
+  /// Re-checks the stored password without touching the session.
+  bool verifyPassword(String password) => password == _getPassword();
+
   bool isLoggedIn() {
     final loggedIn = _prefs.getBool(_keyIsLoggedIn) ?? false;
     if (!loggedIn) return false;

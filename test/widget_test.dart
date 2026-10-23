@@ -58,6 +58,19 @@ void main() {
     await tester.tap(find.text('Pocket'));
     await tester.pumpAndSettle();
 
+    // 5a. Pocket requires the password again: a wrong one is rejected
+    expect(find.text('Verify Password'), findsOneWidget);
+    expect(find.text('TOTAL SAVINGS'), findsNothing);
+    await tester.enterText(find.byType(TextField).last, 'wrong-pass');
+    await tester.tap(find.text('Verify'));
+    await tester.pumpAndSettle();
+    expect(find.text('Incorrect password.'), findsOneWidget);
+
+    // 5b. The correct password opens Pocket
+    await tester.enterText(find.byType(TextField).last, 'iritot123');
+    await tester.tap(find.text('Verify'));
+    await tester.pumpAndSettle();
+
     // 6. Verify Savings Screen elements in English
     expect(find.text('TOTAL SAVINGS'), findsOneWidget);
     expect(find.text('Deposit'), findsOneWidget);

@@ -309,10 +309,117 @@ class MainNavigationScaffold extends StatefulWidget {
 class _MainNavigationScaffoldState extends State<MainNavigationScaffold> {
   int _currentIndex = 0;
   final int _homeTabIndex = 0;
+  int _homeResetTick = 0;
 
   void _onDataChanged() {
     widget.authService.updateLastActiveTimestamp();
     setState(() {});
+  }
+
+  /// Asks for the account password before the Pocket tab opens. Returns true when verified.
+  Future<bool> _confirmPocketAccess() async {
+    final t = widget.localeService.t;
+    final ctrl = TextEditingController();
+    bool obscure = true;
+    String? error;
+
+    final ok = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          void submit() {
+            if (widget.authService.verifyPassword(ctrl.text)) {
+              Navigator.pop(dialogCtx, true);
+            } else {
+              setDialogState(() => error = t('verifyPasswordWrong'));
+            }
+          }
+
+          return AlertDialog(
+            backgroundColor: AppTheme.surfaceDark,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: const BorderSide(color: AppTheme.borderDark),
+            ),
+            title: Row(
+              children: [
+                const Icon(Icons.lock_outline, color: AppTheme.emeraldGreen, size: 22),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    t('verifyPasswordTitle'),
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+                  ),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(t('verifyPasswordDesc'), style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: ctrl,
+                  autofocus: true,
+                  obscureText: obscure,
+                  style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14),
+                  onSubmitted: (_) => submit(),
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.lock_outline, color: AppTheme.textMuted, size: 20),
+                    suffixIcon: IconButton(
+                      icon: Icon(obscure ? Icons.visibility : Icons.visibility_off, color: AppTheme.textMuted, size: 20),
+                      onPressed: () => setDialogState(() => obscure = !obscure),
+                    ),
+                    hintText: t('passwordHint'),
+                    hintStyle: TextStyle(color: AppTheme.textMuted.withValues(alpha: 0.6)),
+                    errorText: error,
+                    filled: true,
+                    fillColor: AppTheme.surfaceLighter,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppTheme.borderDark)),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogCtx, false),
+                child: Text(t('cancel'), style: const TextStyle(color: AppTheme.textMuted)),
+              ),
+              ElevatedButton(
+                onPressed: submit,
+                style: ElevatedButton.styleFrom(backgroundColor: AppTheme.emeraldGreen, foregroundColor: Colors.black),
+                child: Text(t('verify'), style: const TextStyle(fontWeight: FontWeight.w700)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    // Not disposed here: the dialog's exit animation still reads the controller.
+    return ok ?? false;
+  }
+
+  void _onNavTap(int index) async {
+    widget.authService.updateLastActiveTimestamp();
+    if (index == 2) {
+      _openAddModal();
+      return;
+    }
+    if (index == 0) {
+      // Home always lands on the Spending tab
+      setState(() {
+        _currentIndex = 0;
+        _homeResetTick++;
+      });
+      return;
+    }
+    if (index == 1 && _currentIndex != 1) {
+      final granted = await _confirmPocketAccess();
+      if (!granted || !mounted) return;
+    }
+    setState(() => _currentIndex = index);
   }
 
   void _openAddModal() {
@@ -354,11 +461,10 @@ class _MainNavigationScaffoldState extends State<MainNavigationScaffold> {
         authService: widget.authService,
         localeService: widget.localeService,
         onDataChanged: _onDataChanged,
-        onNavigateToTab: (index) {
-          setState(() => _currentIndex = index);
-        },
+        onNavigateToTab: _onNavTap,
         onOpenAiAssistant: _openAiAssistant,
         initialTabIndex: _homeTabIndex,
+        resetTick: _homeResetTick,
       ),
       SavingsScreen(
         storageService: widget.storageService,
@@ -402,14 +508,7 @@ class _MainNavigationScaffoldState extends State<MainNavigationScaffold> {
         ),
         child: BottomNavigationBar(
           currentIndex: _currentIndex == 2 ? 0 : _currentIndex,
-          onTap: (index) {
-            widget.authService.updateLastActiveTimestamp();
-            if (index == 2) {
-              _openAddModal();
-            } else {
-              setState(() => _currentIndex = index);
-            }
-          },
+          onTap: _onNavTap,
           items: [
             BottomNavigationBarItem(
               icon: const Icon(Icons.home_filled),

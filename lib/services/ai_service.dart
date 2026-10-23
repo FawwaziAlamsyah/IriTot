@@ -183,7 +183,11 @@ Instruksi Respons:
   }
 
   // Parser Pintar untuk Catat Suara / Teks
-  Map<String, dynamic> parseOfflineVoiceOrText(String input) {
+  Map<String, dynamic> parseOfflineVoiceOrText(
+    String input, {
+    List<CategoryItem>? categories,
+    List<Wallet>? wallets,
+  }) {
     final lower = input.toLowerCase();
 
     // 1. Ekstrak Nominal
@@ -232,13 +236,76 @@ Instruksi Respons:
       walletId = 'w_gopay';
     }
 
+    String type = lower.contains('gaji') || lower.contains('pemasukan') || lower.contains('bonus') ? 'income' : 'expense';
+
+    // 4. Sinkronkan dengan kategori & dompet milik pengguna jika disebutkan
+    if (categories != null && categories.isNotEmpty) {
+      final matched = _matchCategoryByName(lower, categories);
+      if (matched != null) {
+        categoryId = matched.id;
+        type = matched.type;
+      } else if (!categories.any((c) => c.id == categoryId)) {
+        final sameType = categories.where((c) => c.type == type);
+        categoryId = (sameType.isNotEmpty ? sameType.first : categories.first).id;
+      }
+    }
+    if (wallets != null && wallets.isNotEmpty) {
+      final matchedWallet = _matchWalletByName(lower, wallets);
+      if (matchedWallet != null) {
+        walletId = matchedWallet.id;
+      } else if (!wallets.any((w) => w.id == walletId)) {
+        walletId = wallets.first.id;
+      }
+    }
+
     return {
       'amount': amount,
       'categoryId': categoryId,
       'walletId': walletId,
       'note': note,
-      'type': lower.contains('gaji') || lower.contains('pemasukan') || lower.contains('bonus') ? 'income' : 'expense',
+      'type': type,
     };
+  }
+
+  static const Set<String> _categoryStopWords = {'dan', 'and', 'the', 'lain', 'lainnya', 'other', 'umum'};
+
+  // Cari kategori yang namanya (atau salah satu kata utamanya) disebut dalam ucapan
+  CategoryItem? _matchCategoryByName(String lowerText, List<CategoryItem> categories) {
+    CategoryItem? best;
+    int bestScore = 0;
+    for (final c in categories) {
+      final name = c.name.toLowerCase().trim();
+      if (name.isEmpty) continue;
+      int score = 0;
+      if (lowerText.contains(name)) {
+        score = name.length + 100;
+      } else {
+        for (final word in name.split(RegExp(r'[^a-z0-9]+'))) {
+          if (word.length >= 3 && !_categoryStopWords.contains(word) && RegExp('\\b${RegExp.escape(word)}\\b').hasMatch(lowerText)) {
+            score = score > word.length ? score : word.length;
+          }
+        }
+      }
+      if (score > bestScore) {
+        bestScore = score;
+        best = c;
+      }
+    }
+    return best;
+  }
+
+  Wallet? _matchWalletByName(String lowerText, List<Wallet> wallets) {
+    Wallet? best;
+    int bestLen = 0;
+    for (final w in wallets) {
+      final name = w.name.toLowerCase().trim();
+      if (name.isEmpty) continue;
+      if (lowerText.contains(name) && name.length > bestLen) {
+        bestLen = name.length;
+        best = w;
+      }
+    }
+    return best;
   }
 
   // Deteksi Maksud Catat Transaksi dari Pertanyaan / Percakapan Chat
@@ -264,7 +331,7 @@ Instruksi Respons:
 
     if (!isLogIntent) return null;
 
-    final parsed = parseOfflineVoiceOrText(query);
+    final parsed = parseOfflineVoiceOrText(query, categories: categories, wallets: wallets);
     final amount = parsed['amount'] as double;
     if (amount <= 0) return null;
 

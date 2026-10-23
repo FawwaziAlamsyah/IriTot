@@ -22,6 +22,7 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback onOpenAiAssistant;
 
   final int initialTabIndex;
+  final int resetTick;
 
   const HomeScreen({
     super.key,
@@ -33,6 +34,7 @@ class HomeScreen extends StatefulWidget {
     required this.onNavigateToTab,
     required this.onOpenAiAssistant,
     this.initialTabIndex = 0,
+    this.resetTick = 0,
   });
 
   @override
@@ -57,6 +59,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   @override
   void didUpdateWidget(HomeScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.resetTick != widget.resetTick) {
+      // Home button pressed: always return to the Spending tab
+      if (_tabController.index != 0) _tabController.animateTo(0);
+      return;
+    }
     if (oldWidget.initialTabIndex != widget.initialTabIndex &&
         _tabController.index != widget.initialTabIndex) {
       _tabController.animateTo(widget.initialTabIndex);
@@ -964,7 +971,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                               Text(
                                 t.note.trim().isEmpty ? (cat?.name ?? (widget.localeService?.isIndonesian == true ? 'Transaksi' : 'Transaction')) : t.note,
                                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
-                                maxLines: 1,
+                                maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 2),

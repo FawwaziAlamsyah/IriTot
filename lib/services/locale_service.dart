@@ -237,6 +237,7 @@ class LocaleService extends ChangeNotifier {
       'addTxDetected': 'Detected: {type} Rp {amount}',
       'apply': 'Apply',
       'listeningVoice': 'Listening to voice...',
+      'voiceAutoStopHint': 'Speak your full entry. It finishes after 5 seconds of silence, or tap the mic.',
       'stopListening': 'Done / Stop',
 
       // Scan Receipt
@@ -282,7 +283,12 @@ class LocaleService extends ChangeNotifier {
       'withdraw': 'Withdraw',
       'secSavingsTargets': 'SAVINGS TARGETS',
       'newPocket': 'New Pocket',
-      'secSavingsHistory': 'SAVINGS HISTORY',
+      'secSavingsHistory': 'POCKET HISTORY',
+      'allMonths': 'All months',
+      'verifyPasswordTitle': 'Verify Password',
+      'verifyPasswordDesc': 'Enter your password to open Pocket.',
+      'verifyPasswordWrong': 'Incorrect password.',
+      'verify': 'Verify',
       'addDepositTitle': 'Deposit Savings',
       'withdrawTitle': 'Withdraw Savings (Outflow)',
       'fromWallet': 'From Wallet:',
@@ -539,6 +545,7 @@ class LocaleService extends ChangeNotifier {
       'addTxDetected': 'Terdeteksi: {type} Rp {amount}',
       'apply': 'Terapkan',
       'listeningVoice': 'Mendengarkan suara...',
+      'voiceAutoStopHint': 'Ucapkan catatan lengkap. Otomatis selesai setelah 5 detik hening, atau ketuk mikrofon.',
       'stopListening': 'Selesai / Berhenti',
 
       // Scan Receipt
@@ -584,7 +591,12 @@ class LocaleService extends ChangeNotifier {
       'withdraw': 'Tarik Dana',
       'secSavingsTargets': 'TARGET & POS CELENGAN',
       'newPocket': 'Pos Baru',
-      'secSavingsHistory': 'RIWAYAT TABUNGAN',
+      'secSavingsHistory': 'RIWAYAT POCKET',
+      'allMonths': 'Semua bulan',
+      'verifyPasswordTitle': 'Verifikasi Password',
+      'verifyPasswordDesc': 'Masukkan password untuk membuka Pocket.',
+      'verifyPasswordWrong': 'Password salah.',
+      'verify': 'Verifikasi',
       'addDepositTitle': 'Nabung Masuk',
       'withdrawTitle': 'Tarik Tabungan (Keluar)',
       'fromWallet': 'Dari Dompet Kas:',

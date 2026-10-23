@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../models/savings_pocket.dart';
+import '../models/savings_record.dart';
 import '../services/storage_service.dart';
 import '../services/csv_service.dart';
 import '../services/file_io_service.dart';
@@ -34,6 +35,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
   bool _isBalanceHidden = false;
   bool get _effectiveBalanceHidden => widget.isBalanceHidden ?? _isBalanceHidden;
   String _historyFilter = 'all'; // 'all', 'in', 'out'
+  DateTime? _historyMonth; // null = all months
 
   final NumberFormat _currencyFormat = NumberFormat.currency(
     locale: 'id_ID',
@@ -297,6 +299,10 @@ class _SavingsScreenState extends State<SavingsScreen> {
                     const SizedBox(height: 6),
                     TextField(
                       controller: noteCtrl,
+                maxLength: 500,
+                minLines: 1,
+                maxLines: 4,
+                keyboardType: TextInputType.multiline,
                       style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
                       decoration: InputDecoration(
                         hintText: widget.localeService?.isIndonesian == true ? 'Contoh: Alokasi gaji awal bulan' : 'e.g. Monthly salary allocation',
@@ -522,6 +528,10 @@ class _SavingsScreenState extends State<SavingsScreen> {
                     const SizedBox(height: 6),
                     TextField(
                       controller: noteCtrl,
+                maxLength: 500,
+                minLines: 1,
+                maxLines: 4,
+                keyboardType: TextInputType.multiline,
                       style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
                       decoration: InputDecoration(
                         hintText: widget.localeService?.isIndonesian == true ? 'Contoh: Biaya darurat atau servis' : 'e.g. Emergency expense',
@@ -662,6 +672,10 @@ class _SavingsScreenState extends State<SavingsScreen> {
                     const SizedBox(height: 6),
                     TextField(
                       controller: noteCtrl,
+                maxLength: 500,
+                minLines: 1,
+                maxLines: 4,
+                keyboardType: TextInputType.multiline,
                       style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
                       decoration: InputDecoration(
                         hintText: widget.localeService?.isIndonesian == true ? 'Contoh: Target tercapai sebelum akhir tahun' : 'e.g. Target reached before year end',
@@ -754,7 +768,22 @@ class _SavingsScreenState extends State<SavingsScreen> {
     final monthlyOut = widget.storageService.getMonthlySavingsOut(now.month, now.year);
     final netGrowth = widget.storageService.getNetSavingsGrowth(now.month, now.year);
 
-    final filteredRecords = records.where((r) {
+    // Pocket history: newest first, optionally limited to one month
+    final sortedRecords = List<SavingsRecord>.from(records)..sort((a, b) => b.date.compareTo(a.date));
+    final availableMonths = <DateTime>[];
+    for (final r in sortedRecords) {
+      final m = DateTime(r.date.year, r.date.month);
+      if (!availableMonths.contains(m)) availableMonths.add(m);
+    }
+    if (_historyMonth != null && !availableMonths.contains(_historyMonth)) {
+      _historyMonth = null;
+    }
+
+    final filteredRecords = sortedRecords.where((r) {
+      if (_historyMonth != null &&
+          (r.date.year != _historyMonth!.year || r.date.month != _historyMonth!.month)) {
+        return false;
+      }
       if (_historyFilter == 'in') return r.isIn;
       if (_historyFilter == 'out') return r.isOut;
       return true;
@@ -1153,6 +1182,24 @@ class _SavingsScreenState extends State<SavingsScreen> {
                   ),
                 ],
               ),
+              const SizedBox(height: 8),
+              if (availableMonths.isNotEmpty)
+                SizedBox(
+                  height: 32,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: [
+                      _buildMonthChip(null, t('allMonths')),
+                      for (final m in availableMonths) ...[
+                        const SizedBox(width: 6),
+                        _buildMonthChip(
+                          m,
+                          DateFormat('MMM yyyy', widget.localeService?.isIndonesian == true ? 'id_ID' : 'en_US').format(m),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
               const SizedBox(height: 10),
 
               if (filteredRecords.isEmpty)
@@ -1211,6 +1258,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
                                     children: [
                                       Text(
                                         r.note,
+                                        maxLines: 2,
                                         style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
                                         overflow: TextOverflow.ellipsis,
                                       ),
@@ -1517,6 +1565,31 @@ class _SavingsScreenState extends State<SavingsScreen> {
             ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildMonthChip(DateTime? month, String label) {
+    final isSelected = _historyMonth == month;
+    return GestureDetector(
+      onTap: () => setState(() => _historyMonth = month),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? AppTheme.cyanAccent.withValues(alpha: 0.2) : AppTheme.surfaceLighter,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: isSelected ? AppTheme.cyanAccent : AppTheme.borderDark),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+              color: isSelected ? AppTheme.cyanAccent : AppTheme.textSecondary,
+            ),
+          ),
+        ),
       ),
     );
   }

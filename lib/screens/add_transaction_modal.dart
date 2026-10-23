@@ -8,6 +8,7 @@ import '../services/storage_service.dart';
 import '../services/ai_service.dart';
 import '../services/locale_service.dart';
 import '../services/speech_service.dart';
+import '../widgets/voice_wave.dart';
 import '../theme/app_theme.dart';
 
 class AddTransactionModal extends StatefulWidget {
@@ -104,26 +105,38 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
     super.dispose();
   }
 
+  bool _voiceCancelled = false;
+
+  /// Called once when listening ends (silence, manual stop or engine end):
+  /// the full spoken sentence is parsed against the user's categories and wallets.
+  void _finishVoice() {
+    if (!_isVoiceRecording || !mounted) return;
+    setState(() => _isVoiceRecording = false);
+    if (_voiceCancelled) return;
+    final text = _voiceInputController.text.trim();
+    if (text.isEmpty) return;
+    _applyParsedVoice(text);
+  }
+
   void _toggleVoiceRecording() async {
     if (_isVoiceRecording) {
+      // Tap again = finish now and process what was said
       SpeechService.instance.stopListening();
-      setState(() => _isVoiceRecording = false);
+      _finishVoice();
       return;
     }
 
+    _voiceCancelled = false;
+    _voiceInputController.clear();
     setState(() => _isVoiceRecording = true);
 
     final started = await SpeechService.instance.startListening(
       onResult: (text) {
         if (!mounted) return;
-        setState(() {
-          _voiceInputController.text = text;
-        });
-        _applyParsedVoice(text);
+        // Only show live text; parsing waits until the user finishes speaking
+        setState(() => _voiceInputController.text = text);
       },
-      onEnd: () {
-        if (mounted) setState(() => _isVoiceRecording = false);
-      },
+      onEnd: _finishVoice,
       onError: (err) {
         if (mounted) {
           setState(() => _isVoiceRecording = false);
@@ -142,10 +155,9 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
       setState(() => _isVoiceRecording = false);
     }
   }
-
   void _applyParsedVoice(String text) {
     if (text.trim().isEmpty) return;
-    final parsed = widget.aiService.parseOfflineVoiceOrText(text);
+    final parsed = widget.aiService.parseOfflineVoiceOrText(text, categories: _categories, wallets: _wallets);
     setState(() {
       _type = parsed['type'] as String;
       final amount = parsed['amount'] as double;
@@ -368,9 +380,13 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
                     // Tombol Voice
                     IconButton(
                       onPressed: _toggleVoiceRecording,
-                      icon: Icon(
-                        _isVoiceRecording ? Icons.mic : Icons.mic_none,
-                        color: _isVoiceRecording ? AppTheme.coralRose : AppTheme.violetAI,
+                      icon: PulsingMic(
+                        active: _isVoiceRecording,
+                        color: AppTheme.coralRose,
+                        child: Icon(
+                          _isVoiceRecording ? Icons.mic : Icons.mic_none,
+                          color: _isVoiceRecording ? AppTheme.coralRose : AppTheme.violetAI,
+                        ),
                       ),
                       tooltip: t('addTxVoiceTooltip'),
                     ),
@@ -395,7 +411,7 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.graphic_eq, color: AppTheme.violetAI, size: 20),
+                        const VoiceWave(color: AppTheme.violetAI, height: 22),
                         const SizedBox(width: 8),
                         Text(
                           t('addTxVoiceHeader'),
@@ -429,12 +445,18 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
                       ),
                       onSubmitted: _applyParsedVoice,
                     ),
+                    const SizedBox(height: 6),
+                    Text(
+                      t('voiceAutoStopHint'),
+                      style: const TextStyle(fontSize: 10, color: AppTheme.textMuted),
+                    ),
                     const SizedBox(height: 8),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         TextButton(
                           onPressed: () {
+                            _voiceCancelled = true;
                             SpeechService.instance.stopListening();
                             setState(() => _isVoiceRecording = false);
                           },
@@ -442,7 +464,10 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
                         ),
                         const SizedBox(width: 8),
                         ElevatedButton(
-                          onPressed: () => _applyParsedVoice(_voiceInputController.text),
+                          onPressed: () {
+                            SpeechService.instance.stopListening();
+                            _finishVoice();
+                          },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.violetAI,
                             foregroundColor: Colors.white,
@@ -677,6 +702,10 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
             const SizedBox(height: 6),
             TextField(
               controller: _noteController,
+                maxLength: 500,
+                minLines: 1,
+                maxLines: 4,
+                keyboardType: TextInputType.multiline,
               style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
               decoration: InputDecoration(
                 hintText: t('addTxNoteHint'),
