@@ -33,10 +33,10 @@ void main() {
     expect(find.text('Sign In to Your Account'), findsOneWidget);
     expect(find.text('Sign In to IRITOT'), findsOneWidget);
     expect(find.text('Isi Default'), findsNothing);
-    expect(find.textContaining('Default: usertest'), findsNothing);
+    expect(find.textContaining('Default: NewUser'), findsNothing);
 
     // 2. Enter credentials into empty text fields
-    await tester.enterText(find.byType(TextField).at(0), 'usertest');
+    await tester.enterText(find.byType(TextField).at(0), 'NewUser');
     await tester.enterText(find.byType(TextField).at(1), 'iritot123');
 
     // 3. Tap Login Button
@@ -69,18 +69,28 @@ void main() {
     final authService = await AuthService.init();
 
     // Initial default credentials
-    expect(authService.getUsername(), 'usertest');
+    expect(authService.getUsername(), 'NewUser');
+    expect(authService.getDisplayName(), 'NewUser');
     expect(authService.isLoggedIn(), false);
 
     // Login test with wrong password
-    final wrongLogin = await authService.login('usertest', 'wrongpass');
+    final wrongLogin = await authService.login('NewUser', 'wrongpass');
     expect(wrongLogin, false);
     expect(authService.isLoggedIn(), false);
 
     // Login test with correct credentials
-    final correctLogin = await authService.login('usertest', 'iritot123');
+    final correctLogin = await authService.login('NewUser', 'iritot123');
     expect(correctLogin, true);
     expect(authService.isLoggedIn(), true);
+
+    // Update profile test (Display Name and Username)
+    final profileUpdate = await authService.updateProfile(
+      newDisplayName: 'Aji Finance',
+      newUsername: 'ajifinance',
+    );
+    expect(profileUpdate['success'], true);
+    expect(authService.getDisplayName(), 'Aji Finance');
+    expect(authService.getUsername(), 'ajifinance');
 
     // Change credentials: test failure with incorrect old username
     final failOldUser = await authService.changeCredentials(
@@ -94,7 +104,7 @@ void main() {
 
     // Change credentials: test failure with incorrect old password
     final failOldPass = await authService.changeCredentials(
-      oldUsername: 'usertest',
+      oldUsername: 'ajifinance',
       oldPassword: 'wrongoldpassword',
       newUsername: 'ajifinance',
       newPassword: 'newpassword123',
@@ -104,7 +114,7 @@ void main() {
 
     // Change credentials: test failure with short password (< 4 chars)
     final failShortPass = await authService.changeCredentials(
-      oldUsername: 'usertest',
+      oldUsername: 'ajifinance',
       oldPassword: 'iritot123',
       newUsername: 'ajifinance',
       newPassword: '12',
@@ -114,7 +124,7 @@ void main() {
 
     // Change credentials: test success with valid old and new credentials
     final successChange = await authService.changeCredentials(
-      oldUsername: 'usertest',
+      oldUsername: 'ajifinance',
       oldPassword: 'iritot123',
       newUsername: 'ajifinance',
       newPassword: 'newpassword123',
@@ -123,7 +133,7 @@ void main() {
     expect(authService.getUsername(), 'ajifinance');
 
     // Verify login with updated credentials
-    final oldLoginAttempt = await authService.login('usertest', 'iritot123');
+    final oldLoginAttempt = await authService.login('NewUser', 'iritot123');
     expect(oldLoginAttempt, false);
 
     final newLoginAttempt = await authService.login('ajifinance', 'newpassword123');
@@ -170,7 +180,7 @@ void main() {
 
     // Login at t0
     final t0 = DateTime.now().millisecondsSinceEpoch;
-    await authService.login('usertest', 'iritot123');
+    await authService.login('NewUser', 'iritot123');
     await authService.updateLastActiveTimestamp(t0);
     expect(authService.isLoggedIn(), true);
 

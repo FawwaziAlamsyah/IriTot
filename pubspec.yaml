@@ -42,6 +42,7 @@ dependencies:
   shared_preferences: ^2.5.6
   # Workaround bug R8 + JNI pada shared_preferences_android 2.5.0+ (flutter/flutter#194649); hapus pin ini setelah ada versi perbaikan dan build release terbukti jalan di perangkat.
   shared_preferences_android: '>=2.4.28 <2.5.0'
+  image_picker: ^1.2.4
 
 dev_dependencies:
   flutter_test:

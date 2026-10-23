@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
 import '../models/wallet.dart';
 import '../models/category.dart';
+import '../models/transaction_item.dart';
 import '../services/storage_service.dart';
 import '../services/csv_service.dart';
 import '../services/ai_service.dart';
@@ -37,6 +38,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late TextEditingController _endpointController;
   late String _selectedProvider;
   bool _obscureApiKey = true;
+  String _categoryFilter = 'all'; // 'all', 'expense', 'income'
+  bool _showAllCategories = false;
 
   @override
   void initState() {
@@ -409,6 +412,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _exportCsv() {
+    final t = widget.localeService.t;
     final transactions = widget.storageService.getTransactions();
     final wallets = widget.storageService.getWallets();
     final categories = widget.storageService.getCategories();
@@ -425,7 +429,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return AlertDialog(
           backgroundColor: AppTheme.surfaceDark,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: const BorderSide(color: AppTheme.borderDark)),
-          title: const Text('Ekspor Cadangan CSV', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+          title: Text(t('exportModalTitle'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -452,18 +456,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogCtx),
-              child: const Text('Tutup', style: TextStyle(color: AppTheme.textMuted)),
+              child: Text(t('cancel'), style: const TextStyle(color: AppTheme.textMuted)),
             ),
             ElevatedButton.icon(
               onPressed: () {
                 Clipboard.setData(ClipboardData(text: csvString));
                 Navigator.pop(dialogCtx);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('File CSV disalin ke Clipboard!'), backgroundColor: AppTheme.emeraldGreen),
+                  SnackBar(content: Text(t('csvCopied')), backgroundColor: AppTheme.emeraldGreen),
                 );
               },
               icon: const Icon(Icons.copy, size: 16),
-              label: const Text('Salin CSV'),
+              label: Text(t('copyCsv')),
               style: ElevatedButton.styleFrom(backgroundColor: AppTheme.cyanAccent, foregroundColor: Colors.black),
             ),
           ],
@@ -472,15 +476,256 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _showChangeCredentialsDialog() {
+  void _showImportCsvDialog() {
+    final t = widget.localeService.t;
+    final csvCtrl = TextEditingController();
+    bool skipDuplicates = true;
+    List<TransactionItem> previewItems = [];
+    String? validationMsg;
+
+    void updatePreview(String text, StateSetter setModalState) {
+      final wallets = widget.storageService.getWallets();
+      final categories = widget.storageService.getCategories();
+      if (text.trim().isEmpty) {
+        setModalState(() {
+          previewItems = [];
+          validationMsg = null;
+        });
+        return;
+      }
+
+      final parsed = CsvService.parseCsvToTransactions(
+        csvString: text,
+        wallets: wallets,
+        categories: categories,
+      );
+
+      setModalState(() {
+        previewItems = parsed;
+        if (parsed.isEmpty) {
+          validationMsg = t('importNoValid');
+        } else {
+          final expCount = parsed.where((item) => item.type == 'expense').length;
+          final incCount = parsed.where((item) => item.type == 'income').length;
+          validationMsg = '${parsed.length} ${t('importValidDetected')} ($expCount pengeluaran, $incCount pemasukan)';
+        }
+      });
+    }
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (builderCtx, setModalState) {
+            final isValid = previewItems.isNotEmpty;
+            return AlertDialog(
+              backgroundColor: AppTheme.surfaceDark,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: const BorderSide(color: AppTheme.borderDark),
+              ),
+              title: Row(
+                children: [
+                  const Icon(Icons.file_upload_outlined, color: AppTheme.emeraldGreen, size: 22),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      t('importModalTitle'),
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+                    ),
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      t('importCsvSubtitle'),
+                      style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: csvCtrl,
+                      maxLines: 5,
+                      style: const TextStyle(color: AppTheme.textPrimary, fontSize: 11, fontFamily: 'monospace'),
+                      decoration: InputDecoration(
+                        hintText: 'ID,Tanggal,Tipe,Dompet,Kategori,Nominal,Keterangan\n...',
+                        hintStyle: TextStyle(color: AppTheme.textMuted.withValues(alpha: 0.5), fontSize: 11),
+                        filled: true,
+                        fillColor: AppTheme.surfaceLighter,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.borderDark)),
+                        contentPadding: const EdgeInsets.all(12),
+                      ),
+                      onChanged: (val) => updatePreview(val, setModalState),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            final data = await Clipboard.getData(Clipboard.kTextPlain);
+                            if (data?.text != null && data!.text!.trim().isNotEmpty) {
+                              csvCtrl.text = data.text!;
+                              updatePreview(data.text!, setModalState);
+                            }
+                          },
+                          icon: const Icon(Icons.paste, size: 14, color: AppTheme.cyanAccent),
+                          label: Text(t('pasteFromClipboard'), style: const TextStyle(fontSize: 11, color: AppTheme.cyanAccent)),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: AppTheme.borderDark),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            minimumSize: Size.zero,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        if (csvCtrl.text.isNotEmpty)
+                          TextButton(
+                            onPressed: () {
+                              csvCtrl.clear();
+                              updatePreview('', setModalState);
+                            },
+                            child: const Text('Bersihkan', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                          ),
+                      ],
+                    ),
+                    if (validationMsg != null) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: isValid
+                              ? AppTheme.emeraldGreen.withValues(alpha: 0.12)
+                              : AppTheme.coralRose.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isValid
+                                ? AppTheme.emeraldGreen.withValues(alpha: 0.3)
+                                : AppTheme.coralRose.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              isValid ? Icons.check_circle_outline : Icons.warning_amber_rounded,
+                              size: 16,
+                              color: isValid ? AppTheme.emeraldGreen : AppTheme.coralRose,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                validationMsg!,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: isValid ? AppTheme.emeraldGreen : AppTheme.coralRose,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 10),
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      value: skipDuplicates,
+                      activeColor: AppTheme.emeraldGreen,
+                      title: Text(
+                        t('importSkipDuplicates'),
+                        style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                      ),
+                      onChanged: (val) => setModalState(() => skipDuplicates = val ?? true),
+                      controlAffinity: ListTileControlAffinity.leading,
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogCtx),
+                  child: Text(t('cancel'), style: const TextStyle(color: AppTheme.textMuted)),
+                ),
+                ElevatedButton.icon(
+                  onPressed: isValid
+                      ? () async {
+                          Navigator.pop(dialogCtx);
+                          final count = await widget.storageService.importTransactions(
+                            previewItems,
+                            skipDuplicates: skipDuplicates,
+                          );
+                          if (mounted) {
+                            setState(() {});
+                            widget.onDataChanged();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Berhasil mengimpor $count transaksi baru!'),
+                                backgroundColor: AppTheme.emeraldGreen,
+                              ),
+                            );
+                          }
+                        }
+                      : null,
+                  icon: const Icon(Icons.file_upload, size: 16),
+                  label: Text(t('importNow'), style: const TextStyle(fontWeight: FontWeight.w700)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.emeraldGreen,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: AppTheme.surfaceLighter,
+                    disabledForegroundColor: AppTheme.textMuted,
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildCategoryFilterChip({
+    required String label,
+    required bool isSelected,
+    Color activeColor = AppTheme.cyanAccent,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isSelected ? activeColor.withValues(alpha: 0.15) : AppTheme.surfaceLighter,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? activeColor.withValues(alpha: 0.5) : AppTheme.borderDark,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            color: isSelected ? activeColor : AppTheme.textMuted,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showEditProfileDialog() {
     final t = widget.localeService.t;
     final scaffoldMessenger = ScaffoldMessenger.of(context);
-    final oldUserCtrl = TextEditingController(text: widget.authService.getUsername());
+    final displayNameCtrl = TextEditingController(text: widget.authService.getDisplayName());
+    final usernameCtrl = TextEditingController(text: widget.authService.getUsername());
     final oldPassCtrl = TextEditingController();
-    final newUserCtrl = TextEditingController();
     final newPassCtrl = TextEditingController();
     final confirmPassCtrl = TextEditingController();
 
+    bool changePassword = false;
     String? dialogError;
     bool obscureOldPass = true;
     bool obscureNewPass = true;
@@ -501,11 +746,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               title: Row(
                 children: [
-                  const Icon(Icons.shield_outlined, color: AppTheme.cyanAccent, size: 20),
+                  const Icon(Icons.manage_accounts_outlined, color: AppTheme.cyanAccent, size: 22),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      t('changeCredentialsTitle'),
+                      t('editProfileTitle'),
                       style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
                     ),
                   ),
@@ -519,7 +764,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        t('changeCredentialsDesc'),
+                        t('editProfileSubtitle'),
                         style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
                       ),
                       const SizedBox(height: 14),
@@ -548,14 +793,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                         ),
 
-                      // Username Lama
-                      Text(t('oldUsernameLabel'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+                      // Nama Tampilan / Panggilan
+                      Text(t('displayNameLabel'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
                       const SizedBox(height: 4),
                       TextField(
-                        controller: oldUserCtrl,
+                        controller: displayNameCtrl,
                         style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
                         decoration: InputDecoration(
-                          hintText: t('oldUsernameHint'),
+                          hintText: t('displayNameHint'),
                           hintStyle: TextStyle(color: AppTheme.textMuted.withValues(alpha: 0.5)),
                           filled: true,
                           fillColor: AppTheme.surfaceLighter,
@@ -565,36 +810,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                       const SizedBox(height: 10),
 
-                      // Password Lama
-                      Text(t('oldPasswordLabel'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
-                      const SizedBox(height: 4),
-                      TextField(
-                        controller: oldPassCtrl,
-                        obscureText: obscureOldPass,
-                        style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
-                        decoration: InputDecoration(
-                          hintText: t('oldPasswordHint'),
-                          hintStyle: TextStyle(color: AppTheme.textMuted.withValues(alpha: 0.5)),
-                          filled: true,
-                          fillColor: AppTheme.surfaceLighter,
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppTheme.borderDark)),
-                          suffixIcon: IconButton(
-                            icon: Icon(obscureOldPass ? Icons.visibility : Icons.visibility_off, color: AppTheme.textMuted, size: 18),
-                            onPressed: () => setDialogState(() => obscureOldPass = !obscureOldPass),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-
-                      const Divider(color: AppTheme.borderDark, height: 1),
-                      const SizedBox(height: 14),
-
-                      // Username Baru
+                      // Username Akun
                       Text(t('newUsernameLabel'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
                       const SizedBox(height: 4),
                       TextField(
-                        controller: newUserCtrl,
+                        controller: usernameCtrl,
                         style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
                         decoration: InputDecoration(
                           hintText: t('newUsernameHint'),
@@ -605,50 +825,89 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         ),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 12),
 
-                      // Password Baru
-                      Text(t('newPasswordLabel'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
-                      const SizedBox(height: 4),
-                      TextField(
-                        controller: newPassCtrl,
-                        obscureText: obscureNewPass,
-                        style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
-                        decoration: InputDecoration(
-                          hintText: t('newPasswordHint'),
-                          hintStyle: TextStyle(color: AppTheme.textMuted.withValues(alpha: 0.5)),
-                          filled: true,
-                          fillColor: AppTheme.surfaceLighter,
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppTheme.borderDark)),
-                          suffixIcon: IconButton(
-                            icon: Icon(obscureNewPass ? Icons.visibility : Icons.visibility_off, color: AppTheme.textMuted, size: 18),
-                            onPressed: () => setDialogState(() => obscureNewPass = !obscureNewPass),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      // Checkbox Ganti Kata Sandi
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        value: changePassword,
+                        activeColor: AppTheme.cyanAccent,
+                        title: Text(
+                          t('changePasswordCheck'),
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
                         ),
+                        onChanged: (val) => setDialogState(() => changePassword = val ?? false),
+                        controlAffinity: ListTileControlAffinity.leading,
                       ),
-                      const SizedBox(height: 10),
 
-                      // Konfirmasi Password Baru
-                      Text(t('confirmPasswordLabel'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
-                      const SizedBox(height: 4),
-                      TextField(
-                        controller: confirmPassCtrl,
-                        obscureText: obscureConfirmPass,
-                        style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
-                        decoration: InputDecoration(
-                          hintText: t('confirmPasswordHint'),
-                          hintStyle: TextStyle(color: AppTheme.textMuted.withValues(alpha: 0.5)),
-                          filled: true,
-                          fillColor: AppTheme.surfaceLighter,
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppTheme.borderDark)),
-                          suffixIcon: IconButton(
-                            icon: Icon(obscureConfirmPass ? Icons.visibility : Icons.visibility_off, color: AppTheme.textMuted, size: 18),
-                            onPressed: () => setDialogState(() => obscureConfirmPass = !obscureConfirmPass),
+                      if (changePassword) ...[
+                        const SizedBox(height: 8),
+                        // Password Lama
+                        Text(t('oldPasswordLabel'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+                        const SizedBox(height: 4),
+                        TextField(
+                          controller: oldPassCtrl,
+                          obscureText: obscureOldPass,
+                          style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
+                          decoration: InputDecoration(
+                            hintText: t('oldPasswordHint'),
+                            hintStyle: TextStyle(color: AppTheme.textMuted.withValues(alpha: 0.5)),
+                            filled: true,
+                            fillColor: AppTheme.surfaceLighter,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppTheme.borderDark)),
+                            suffixIcon: IconButton(
+                              icon: Icon(obscureOldPass ? Icons.visibility : Icons.visibility_off, color: AppTheme.textMuted, size: 18),
+                              onPressed: () => setDialogState(() => obscureOldPass = !obscureOldPass),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           ),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         ),
-                      ),
+                        const SizedBox(height: 10),
+
+                        // Password Baru
+                        Text(t('newPasswordLabel'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+                        const SizedBox(height: 4),
+                        TextField(
+                          controller: newPassCtrl,
+                          obscureText: obscureNewPass,
+                          style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
+                          decoration: InputDecoration(
+                            hintText: t('newPasswordHint'),
+                            hintStyle: TextStyle(color: AppTheme.textMuted.withValues(alpha: 0.5)),
+                            filled: true,
+                            fillColor: AppTheme.surfaceLighter,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppTheme.borderDark)),
+                            suffixIcon: IconButton(
+                              icon: Icon(obscureNewPass ? Icons.visibility : Icons.visibility_off, color: AppTheme.textMuted, size: 18),
+                              onPressed: () => setDialogState(() => obscureNewPass = !obscureNewPass),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+
+                        // Konfirmasi Password Baru
+                        Text(t('confirmPasswordLabel'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+                        const SizedBox(height: 4),
+                        TextField(
+                          controller: confirmPassCtrl,
+                          obscureText: obscureConfirmPass,
+                          style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
+                          decoration: InputDecoration(
+                            hintText: t('confirmPasswordHint'),
+                            hintStyle: TextStyle(color: AppTheme.textMuted.withValues(alpha: 0.5)),
+                            filled: true,
+                            fillColor: AppTheme.surfaceLighter,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppTheme.borderDark)),
+                            suffixIcon: IconButton(
+                              icon: Icon(obscureConfirmPass ? Icons.visibility : Icons.visibility_off, color: AppTheme.textMuted, size: 18),
+                              onPressed: () => setDialogState(() => obscureConfirmPass = !obscureConfirmPass),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -662,27 +921,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onPressed: isSubmitting
                       ? null
                       : () async {
-                          final oldUser = oldUserCtrl.text.trim();
+                          final newName = displayNameCtrl.text.trim();
+                          final newUser = usernameCtrl.text.trim();
                           final oldPass = oldPassCtrl.text;
-                          final newUser = newUserCtrl.text.trim();
                           final newPass = newPassCtrl.text;
                           final confirmPass = confirmPassCtrl.text;
 
-                          if (oldUser.isEmpty || oldPass.isEmpty) {
-                            setDialogState(() => dialogError = t('errOldRequired'));
+                          if (newName.isEmpty) {
+                            setDialogState(() => dialogError = 'Nama tampilan tidak boleh kosong.');
                             return;
                           }
                           if (newUser.isEmpty) {
                             setDialogState(() => dialogError = t('errNewUserEmpty'));
                             return;
                           }
-                          if (newPass.length < 4) {
-                            setDialogState(() => dialogError = t('errNewPassShort'));
-                            return;
-                          }
-                          if (newPass != confirmPass) {
-                            setDialogState(() => dialogError = t('errPassMismatch'));
-                            return;
+
+                          if (changePassword) {
+                            if (oldPass.isEmpty) {
+                              setDialogState(() => dialogError = t('errOldRequired'));
+                              return;
+                            }
+                            if (newPass.length < 4) {
+                              setDialogState(() => dialogError = t('errNewPassShort'));
+                              return;
+                            }
+                            if (newPass != confirmPass) {
+                              setDialogState(() => dialogError = t('errPassMismatch'));
+                              return;
+                            }
                           }
 
                           setDialogState(() {
@@ -690,11 +956,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             dialogError = null;
                           });
 
-                          final result = await widget.authService.changeCredentials(
-                            oldUsername: oldUser,
-                            oldPassword: oldPass,
+                          final result = await widget.authService.updateProfile(
+                            newDisplayName: newName,
                             newUsername: newUser,
-                            newPassword: newPass,
+                            oldPassword: changePassword ? oldPass : null,
+                            newPassword: changePassword ? newPass : null,
                           );
 
                           if (result['success'] == true) {
@@ -703,27 +969,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             }
                             if (!mounted) return;
                             setState(() {});
+                            widget.onDataChanged();
                             scaffoldMessenger.showSnackBar(
                               SnackBar(
-                                content: Text(t('credentialsUpdatedSuccess')),
+                                content: Text(t('profileUpdatedSuccess')),
                                 backgroundColor: AppTheme.emeraldGreen,
                               ),
                             );
                           } else {
                             setDialogState(() {
                               isSubmitting = false;
-                              dialogError = result['message'] as String? ?? 'Failed to update credentials.';
+                              dialogError = result['message'] as String? ?? 'Gagal memperbarui profil.';
                             });
                           }
                         },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.cyanAccent,
                     foregroundColor: Colors.black,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
-                  child: isSubmitting
-                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
-                      : Text(t('saveChanges'), style: const TextStyle(fontWeight: FontWeight.w700)),
+                  child: Text(t('saveChanges'), style: const TextStyle(fontWeight: FontWeight.w700)),
                 ),
               ],
             );
@@ -890,10 +1154,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  '@${widget.authService.getUsername()}',
+                                  widget.authService.getDisplayName(),
                                   style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
                                 ),
                                 const SizedBox(height: 2),
+                                Text(
+                                  '@${widget.authService.getUsername()}',
+                                  style: const TextStyle(fontSize: 12, color: AppTheme.cyanAccent, fontWeight: FontWeight.w500),
+                                ),
+                                const SizedBox(height: 3),
                                 Row(
                                   children: [
                                     const Icon(Icons.check_circle, size: 12, color: AppTheme.emeraldGreen),
@@ -945,11 +1214,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     const Divider(color: AppTheme.borderDark, height: 1),
                     ListTile(
-                      leading: const Icon(Icons.lock_reset, color: AppTheme.cyanAccent, size: 22),
-                      title: Text(t('changeCredentialsTitle'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
-                      subtitle: Text(t('changeCredentialsSubtitle'), style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                      leading: const Icon(Icons.manage_accounts_outlined, color: AppTheme.cyanAccent, size: 22),
+                      title: Text(t('editProfileTitle'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
+                      subtitle: Text(t('editProfileSubtitle'), style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
                       trailing: const Icon(Icons.chevron_right, size: 18, color: AppTheme.textMuted),
-                      onTap: _showChangeCredentialsDialog,
+                      onTap: _showEditProfileDialog,
                     ),
                     const Divider(color: AppTheme.borderDark, height: 1),
                     ListTile(
@@ -1056,54 +1325,61 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
               const SizedBox(height: 8),
-              ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: wallets.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 8),
-                itemBuilder: (context, index) {
-                  final w = wallets[index];
-                  return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: AppTheme.surfaceDark,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppTheme.borderDark),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              w.type == 'bank' ? Icons.account_balance : (w.type == 'ewallet' ? Icons.phone_android : Icons.payments),
-                              color: Color(w.colorValue),
-                              size: 20,
-                            ),
-                            const SizedBox(width: 12),
-                            Text(w.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
-                          ],
+              Material(
+                color: AppTheme.surfaceDark,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: const BorderSide(color: AppTheme.borderDark),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  children: [
+                    for (int i = 0; i < wallets.length; i++) ...[
+                      if (i > 0) const Divider(color: AppTheme.borderDark, height: 1),
+                      ListTile(
+                        dense: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                        leading: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: Color(wallets[i].colorValue).withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            wallets[i].type == 'bank'
+                                ? Icons.account_balance
+                                : (wallets[i].type == 'ewallet' ? Icons.phone_android : Icons.payments),
+                            color: Color(wallets[i].colorValue),
+                            size: 18,
+                          ),
                         ),
-                        Row(
+                        title: Text(wallets[i].name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
+                        subtitle: Text(
+                          wallets[i].type == 'bank' ? t('typeBank') : (wallets[i].type == 'ewallet' ? t('typeEWallet') : t('typeCash')),
+                          style: const TextStyle(fontSize: 10, color: AppTheme.textMuted),
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              'Rp ${w.balance.toStringAsFixed(0)}',
+                              'Rp ${wallets[i].balance.toStringAsFixed(0)}',
                               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
                             ),
                             const SizedBox(width: 8),
-                            GestureDetector(
-                              onTap: () => _showDeleteWalletConfirmDialog(w),
-                              child: const Padding(
-                                padding: EdgeInsets.all(4),
-                                child: Icon(Icons.delete_outline, size: 18, color: AppTheme.coralRose),
-                              ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, size: 18, color: AppTheme.coralRose),
+                              onPressed: () => _showDeleteWalletConfirmDialog(wallets[i]),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                              tooltip: t('delete'),
                             ),
                           ],
                         ),
-                      ],
-                    ),
-                  );
-                },
+                      ),
+                    ],
+                  ],
+                ),
               ),
               const SizedBox(height: 24),
 
@@ -1111,7 +1387,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(t('secCategories'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.5, color: AppTheme.textSecondary)),
+                  Text(t('manageCategoriesTitle'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.5, color: AppTheme.textSecondary)),
                   TextButton.icon(
                     onPressed: _showAddCategoryDialog,
                     icon: const Icon(Icons.add, size: 16, color: AppTheme.emeraldGreen),
@@ -1121,68 +1397,164 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
               const SizedBox(height: 8),
-              ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: categories.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 8),
-                itemBuilder: (context, index) {
-                  final c = categories[index];
-                  final isExp = c.type == 'expense';
-                  return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: AppTheme.surfaceDark,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppTheme.borderDark),
+              Builder(
+                builder: (context) {
+                  final expenseCats = categories.where((c) => c.type == 'expense').toList();
+                  final incomeCats = categories.where((c) => c.type == 'income').toList();
+
+                  List<CategoryItem> displayedList;
+                  if (_categoryFilter == 'expense') {
+                    displayedList = expenseCats;
+                  } else if (_categoryFilter == 'income') {
+                    displayedList = incomeCats;
+                  } else {
+                    displayedList = categories;
+                  }
+
+                  final totalFiltered = displayedList.length;
+                  final shouldTruncate = !_showAllCategories && totalFiltered > 4;
+                  final visibleList = shouldTruncate ? displayedList.take(4).toList() : displayedList;
+
+                  return Material(
+                    color: AppTheme.surfaceDark,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: const BorderSide(color: AppTheme.borderDark),
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    clipBehavior: Clip.antiAlias,
+                    child: Column(
                       children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 10,
-                              height: 10,
-                              decoration: BoxDecoration(
-                                color: Color(c.colorValue),
-                                shape: BoxShape.circle,
+                        // Filter Segment Chips
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                          child: Row(
+                            children: [
+                              _buildCategoryFilterChip(
+                                label: '${t('categoryFilterAll')} (${categories.length})',
+                                isSelected: _categoryFilter == 'all',
+                                onTap: () => setState(() => _categoryFilter = 'all'),
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              c.name,
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
-                            ),
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: isExp
-                                    ? AppTheme.coralRose.withValues(alpha: 0.12)
-                                    : (c.type == 'income'
-                                        ? AppTheme.emeraldGreen.withValues(alpha: 0.12)
-                                        : AppTheme.cyanAccent.withValues(alpha: 0.12)),
-                                borderRadius: BorderRadius.circular(6),
+                              const SizedBox(width: 8),
+                              _buildCategoryFilterChip(
+                                label: '${t('categoryFilterExpense')} (${expenseCats.length})',
+                                isSelected: _categoryFilter == 'expense',
+                                activeColor: AppTheme.coralRose,
+                                onTap: () => setState(() => _categoryFilter = 'expense'),
                               ),
-                              child: Text(
-                                isExp ? t('expense') : (c.type == 'income' ? t('income') : 'Transfer'),
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700,
-                                  color: isExp ? AppTheme.coralRose : (c.type == 'income' ? AppTheme.emeraldGreen : AppTheme.cyanAccent),
+                              const SizedBox(width: 8),
+                              _buildCategoryFilterChip(
+                                label: '${t('categoryFilterIncome')} (${incomeCats.length})',
+                                isSelected: _categoryFilter == 'income',
+                                activeColor: AppTheme.emeraldGreen,
+                                onTap: () => setState(() => _categoryFilter = 'income'),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Divider(color: AppTheme.borderDark, height: 1),
+
+                        // List Kategori
+                        if (visibleList.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Text(
+                              'Tidak ada kategori di filter ini.',
+                              style: TextStyle(fontSize: 12, color: AppTheme.textMuted.withValues(alpha: 0.7)),
+                            ),
+                          )
+                        else
+                          for (int i = 0; i < visibleList.length; i++) ...[
+                            if (i > 0) const Divider(color: AppTheme.borderDark, height: 1),
+                            ListTile(
+                              dense: true,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                              leading: Container(
+                                width: 28,
+                                height: 28,
+                                decoration: BoxDecoration(
+                                  color: Color(visibleList[i].colorValue).withValues(alpha: 0.2),
+                                  shape: BoxShape.circle,
                                 ),
+                                child: Center(
+                                  child: Container(
+                                    width: 10,
+                                    height: 10,
+                                    decoration: BoxDecoration(
+                                      color: Color(visibleList[i].colorValue),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              title: Row(
+                                children: [
+                                  Text(
+                                    visibleList[i].name,
+                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: visibleList[i].type == 'expense'
+                                          ? AppTheme.coralRose.withValues(alpha: 0.12)
+                                          : (visibleList[i].type == 'income'
+                                              ? AppTheme.emeraldGreen.withValues(alpha: 0.12)
+                                              : AppTheme.cyanAccent.withValues(alpha: 0.12)),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      visibleList[i].type == 'expense'
+                                          ? t('expense')
+                                          : (visibleList[i].type == 'income' ? t('income') : 'Transfer'),
+                                      style: TextStyle(
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w700,
+                                        color: visibleList[i].type == 'expense'
+                                            ? AppTheme.coralRose
+                                            : (visibleList[i].type == 'income' ? AppTheme.emeraldGreen : AppTheme.cyanAccent),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.delete_outline, size: 18, color: AppTheme.coralRose),
+                                onPressed: () => _showDeleteCategoryConfirmDialog(visibleList[i]),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                tooltip: t('delete'),
                               ),
                             ),
                           ],
-                        ),
-                        GestureDetector(
-                          onTap: () => _showDeleteCategoryConfirmDialog(c),
-                          child: const Padding(
-                            padding: EdgeInsets.all(4),
-                            child: Icon(Icons.delete_outline, size: 18, color: AppTheme.coralRose),
+
+                        // Toggle Expand / Collapse jika kategori banyak
+                        if (totalFiltered > 4) ...[
+                          const Divider(color: AppTheme.borderDark, height: 1),
+                          InkWell(
+                            onTap: () => setState(() => _showAllCategories = !_showAllCategories),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    _showAllCategories
+                                        ? t('showLess')
+                                        : '${t('showAll')} ($totalFiltered)',
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.cyanAccent),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Icon(
+                                    _showAllCategories ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                                    size: 16,
+                                    color: AppTheme.cyanAccent,
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   );
@@ -1195,14 +1567,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: 8),
               Material(
                 color: AppTheme.surfaceDark,
-                borderRadius: BorderRadius.circular(16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: const BorderSide(color: AppTheme.borderDark),
+                ),
+                clipBehavior: Clip.antiAlias,
                 child: Column(
                   children: [
                     ListTile(
-                      shape: const RoundedRectangleBorder(
-                        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                      ),
-                      leading: const Icon(Icons.file_download, color: AppTheme.cyanAccent),
+                      leading: const Icon(Icons.file_download_outlined, color: AppTheme.cyanAccent),
                       title: Text(t('exportCsvTitle'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
                       subtitle: Text(t('exportCsvSubtitle'), style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
                       trailing: const Icon(Icons.chevron_right, size: 18, color: AppTheme.textMuted),
@@ -1210,9 +1583,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     const Divider(color: AppTheme.borderDark, height: 1),
                     ListTile(
-                      shape: const RoundedRectangleBorder(
-                        borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
-                      ),
+                      leading: const Icon(Icons.file_upload_outlined, color: AppTheme.emeraldGreen),
+                      title: Text(t('importCsvTitle'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
+                      subtitle: Text(t('importCsvSubtitle'), style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                      trailing: const Icon(Icons.chevron_right, size: 18, color: AppTheme.textMuted),
+                      onTap: _showImportCsvDialog,
+                    ),
+                    const Divider(color: AppTheme.borderDark, height: 1),
+                    ListTile(
                       leading: const Icon(Icons.delete_sweep_outlined, color: AppTheme.coralRose),
                       title: Text(t('resetDataTitle'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.coralRose)),
                       subtitle: Text(t('resetDataSubtitle'), style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
@@ -1350,7 +1728,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Center(
                 child: Column(
                   children: [
-                    const Text('IRITOT v1.0.0', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.textMuted)),
+                    const Text('IRITOT v1.0.5', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.textMuted)),
                     const SizedBox(height: 2),
                     Text(t('offlineBadge'), style: TextStyle(fontSize: 10, color: AppTheme.textMuted.withValues(alpha: 0.6))),
                   ],

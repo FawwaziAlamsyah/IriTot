@@ -30,7 +30,7 @@ class CsvService {
   }
 
   static String _escapeCsv(String value) {
-    if (value.contains(',') || value.contains('"') || value.contains('\n')) {
+    if (value.contains(',') || value.contains(';') || value.contains('"') || value.contains('\n')) {
       return '"${value.replaceAll('"', '""')}"';
     }
     return value;
@@ -48,6 +48,12 @@ class CsvService {
     final catMap = {for (var c in categories) c.name.toLowerCase(): c.id};
     final dateFormat = DateFormat('yyyy-MM-dd HH:mm:ss');
 
+    // Deteksi pemisah delimiter (koma atau titik koma)
+    String delimiter = ',';
+    if (lines.isNotEmpty && lines[0].contains(';') && !lines[0].contains(',')) {
+      delimiter = ';';
+    }
+
     List<TransactionItem> items = [];
 
     // Skip header line
@@ -55,17 +61,26 @@ class CsvService {
       final line = lines[i].trim();
       if (line.isEmpty) continue;
 
-      final cols = _splitCsvLine(line);
-      if (cols.length < 7) continue;
+      final cols = _splitCsvLine(line, delimiter);
+      if (cols.length < 6) continue;
 
       try {
-        final id = cols[0];
-        final date = dateFormat.parse(cols[1]);
-        final type = cols[2].toLowerCase();
-        final walletName = cols[3].toLowerCase();
-        final catName = cols[4].toLowerCase();
-        final amount = double.tryParse(cols[5]) ?? 0.0;
-        final note = cols[6];
+        final id = cols[0].trim().isNotEmpty
+            ? cols[0].trim()
+            : 'tx_imp_${DateTime.now().microsecondsSinceEpoch}_$i';
+
+        DateTime date;
+        try {
+          date = dateFormat.parse(cols[1].trim());
+        } catch (_) {
+          date = DateTime.tryParse(cols[1].trim()) ?? DateTime.now();
+        }
+
+        final type = cols[2].trim().toLowerCase();
+        final walletName = cols[3].trim().toLowerCase();
+        final catName = cols[4].trim().toLowerCase();
+        final amount = double.tryParse(cols[5].trim()) ?? 0.0;
+        final note = cols.length > 6 ? cols[6].trim() : '';
 
         final walletId = walletMap[walletName] ?? (wallets.isNotEmpty ? wallets.first.id : 'w_cash');
         final categoryId = catMap[catName] ?? (categories.isNotEmpty ? categories.first.id : 'cat_food');
@@ -87,7 +102,7 @@ class CsvService {
     return items;
   }
 
-  static List<String> _splitCsvLine(String line) {
+  static List<String> _splitCsvLine(String line, [String delimiter = ',']) {
     List<String> result = [];
     StringBuffer cur = StringBuffer();
     bool inQuotes = false;
@@ -101,7 +116,7 @@ class CsvService {
         } else {
           inQuotes = !inQuotes;
         }
-      } else if (char == ',' && !inQuotes) {
+      } else if (char == delimiter && !inQuotes) {
         result.add(cur.toString());
         cur.clear();
       } else {

@@ -323,6 +323,7 @@ class _MainNavigationScaffoldState extends State<MainNavigationScaffold> {
       builder: (context) => AddTransactionModal(
         storageService: widget.storageService,
         aiService: widget.aiService,
+        localeService: widget.localeService,
         onTransactionAdded: _onDataChanged,
       ),
     );
@@ -336,6 +337,8 @@ class _MainNavigationScaffoldState extends State<MainNavigationScaffold> {
       builder: (context) => AiAssistantSheet(
         storageService: widget.storageService,
         aiService: widget.aiService,
+        localeService: widget.localeService,
+        onDataChanged: _onDataChanged,
       ),
     );
   }
@@ -348,6 +351,7 @@ class _MainNavigationScaffoldState extends State<MainNavigationScaffold> {
       HomeScreen(
         storageService: widget.storageService,
         aiService: widget.aiService,
+        authService: widget.authService,
         localeService: widget.localeService,
         onDataChanged: _onDataChanged,
         onNavigateToTab: (index) {

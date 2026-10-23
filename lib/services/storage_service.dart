@@ -286,6 +286,72 @@ class StorageService {
     await saveWallets(wallets);
   }
 
+  /// Impor transaksi dari cadangan CSV.
+  /// [skipDuplicates] jika true, akan mengabaikan transaksi dengan ID yang sudah ada di penyimpanan.
+  /// Mengembalikan jumlah transaksi yang berhasil ditambahkan.
+  Future<int> importTransactions(
+    List<TransactionItem> importedItems, {
+    bool skipDuplicates = true,
+  }) async {
+    if (importedItems.isEmpty) return 0;
+
+    final currentTransactions = getTransactions();
+    final existingIds = currentTransactions.map((t) => t.id).toSet();
+
+    final List<TransactionItem> toAdd = [];
+    for (int i = 0; i < importedItems.length; i++) {
+      final item = importedItems[i];
+      if (skipDuplicates && existingIds.contains(item.id)) {
+        continue;
+      }
+
+      final finalId = item.id.trim().isNotEmpty && (!existingIds.contains(item.id) || skipDuplicates)
+          ? item.id
+          : 'tx_imp_${DateTime.now().microsecondsSinceEpoch}_$i';
+
+      toAdd.add(TransactionItem(
+        id: finalId,
+        walletId: item.walletId,
+        destinationWalletId: item.destinationWalletId,
+        categoryId: item.categoryId,
+        type: item.type,
+        amount: item.amount,
+        note: item.note,
+        date: item.date,
+      ));
+      existingIds.add(finalId);
+    }
+
+    if (toAdd.isEmpty) return 0;
+
+    currentTransactions.addAll(toAdd);
+    await saveTransactions(currentTransactions);
+
+    // Perbarui saldo dompet untuk transaksi yang baru diimpor
+    final wallets = getWallets();
+    final walletMap = {for (var w in wallets) w.id: w};
+
+    for (final item in toAdd) {
+      final wallet = walletMap[item.walletId] ?? (wallets.isNotEmpty ? wallets.first : null);
+      if (wallet != null) {
+        if (item.type == 'expense') {
+          wallet.balance -= item.amount;
+        } else if (item.type == 'income') {
+          wallet.balance += item.amount;
+        } else if (item.type == 'transfer' && item.destinationWalletId != null) {
+          wallet.balance -= item.amount;
+          final destWallet = walletMap[item.destinationWalletId];
+          if (destWallet != null) {
+            destWallet.balance += item.amount;
+          }
+        }
+      }
+    }
+
+    await saveWallets(wallets);
+    return toAdd.length;
+  }
+
   Future<void> deleteTransaction(String id) async {
     final transactions = getTransactions();
     final index = transactions.indexWhere((t) => t.id == id);

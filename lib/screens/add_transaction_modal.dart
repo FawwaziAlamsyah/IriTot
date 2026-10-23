@@ -1,26 +1,39 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
+import 'package:image_picker/image_picker.dart';
 import '../models/transaction_item.dart';
 import '../models/wallet.dart';
 import '../models/category.dart';
 import '../services/storage_service.dart';
 import '../services/ai_service.dart';
+import '../services/locale_service.dart';
+import '../services/speech_service.dart';
 import '../theme/app_theme.dart';
 
 class AddTransactionModal extends StatefulWidget {
   final StorageService storageService;
   final AiService aiService;
+  final LocaleService? localeService;
   final VoidCallback onTransactionAdded;
   final String? initialType;
   final bool openWithVoice;
+  final double? initialAmount;
+  final String? initialNote;
+  final String? initialCategoryId;
+  final String? initialWalletId;
 
   const AddTransactionModal({
     super.key,
     required this.storageService,
     required this.aiService,
+    this.localeService,
     required this.onTransactionAdded,
     this.initialType,
     this.openWithVoice = false,
+    this.initialAmount,
+    this.initialNote,
+    this.initialCategoryId,
+    this.initialWalletId,
   });
 
   @override
@@ -41,6 +54,9 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
   final DateTime _selectedDate = DateTime.now();
 
   bool _isVoiceRecording = false;
+  bool _isScanningReceipt = false;
+
+  String t(String key) => widget.localeService?.t(key) ?? key;
 
   @override
   void initState() {
@@ -57,20 +73,78 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
         ? initialCats.first.id
         : (_categories.isNotEmpty ? _categories.first.id : 'cat_food');
 
+    if (widget.initialAmount != null && widget.initialAmount! > 0) {
+      _amountController.text = widget.initialAmount!.toStringAsFixed(0);
+    }
+    if (widget.initialNote != null && widget.initialNote!.isNotEmpty) {
+      _noteController.text = widget.initialNote!;
+    }
+    if (widget.initialCategoryId != null && _categories.any((c) => c.id == widget.initialCategoryId)) {
+      _selectedCategoryId = widget.initialCategoryId!;
+    }
+    if (widget.initialWalletId != null && _wallets.any((w) => w.id == widget.initialWalletId)) {
+      _selectedWalletId = widget.initialWalletId!;
+    }
+
     if (widget.openWithVoice) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _startVoiceInputSimulation();
+        _toggleVoiceRecording();
       });
     }
   }
 
-  void _startVoiceInputSimulation() {
-    setState(() {
-      _isVoiceRecording = true;
-    });
+  @override
+  void dispose() {
+    if (_isVoiceRecording) {
+      SpeechService.instance.stopListening();
+    }
+    _amountController.dispose();
+    _noteController.dispose();
+    _voiceInputController.dispose();
+    super.dispose();
+  }
+
+  void _toggleVoiceRecording() async {
+    if (_isVoiceRecording) {
+      SpeechService.instance.stopListening();
+      setState(() => _isVoiceRecording = false);
+      return;
+    }
+
+    setState(() => _isVoiceRecording = true);
+
+    final started = await SpeechService.instance.startListening(
+      onResult: (text) {
+        if (!mounted) return;
+        setState(() {
+          _voiceInputController.text = text;
+        });
+        _applyParsedVoice(text);
+      },
+      onEnd: () {
+        if (mounted) setState(() => _isVoiceRecording = false);
+      },
+      onError: (err) {
+        if (mounted) {
+          setState(() => _isVoiceRecording = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(err),
+              backgroundColor: AppTheme.coralRose,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      },
+    );
+
+    if (!started && mounted) {
+      setState(() => _isVoiceRecording = false);
+    }
   }
 
   void _applyParsedVoice(String text) {
+    if (text.trim().isEmpty) return;
     final parsed = widget.aiService.parseOfflineVoiceOrText(text);
     setState(() {
       _type = parsed['type'] as String;
@@ -84,13 +158,114 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
       _isVoiceRecording = false;
     });
 
+    final typeLabel = _type == 'income' ? t('income') : (_type == 'transfer' ? t('transfer') : t('expense'));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Terdeteksi: ${_type == "income" ? "Pemasukan" : "Pengeluaran"} Rp ${_amountController.text}'),
+        content: Text(
+          t('addTxDetected').replaceAll('{type}', typeLabel).replaceAll('{amount}', _amountController.text),
+        ),
         backgroundColor: AppTheme.emeraldGreen,
         duration: const Duration(seconds: 2),
       ),
     );
+  }
+
+  void _pickAndScanReceipt() async {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.surfaceDark,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  t('scanReceiptTitle'),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+                ),
+                const SizedBox(height: 16),
+                ListTile(
+                  leading: const Icon(Icons.camera_alt_outlined, color: AppTheme.cyanAccent),
+                  title: Text(t('takePhoto'), style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _processReceipt(ImageSource.camera);
+                  },
+                ),
+                const Divider(color: AppTheme.borderDark, height: 1),
+                ListTile(
+                  leading: const Icon(Icons.photo_library_outlined, color: AppTheme.emeraldGreen),
+                  title: Text(t('chooseGallery'), style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _processReceipt(ImageSource.gallery);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _processReceipt(ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final file = await picker.pickImage(source: source);
+      if (file == null) return;
+
+      setState(() => _isScanningReceipt = true);
+
+      final bytes = await file.readAsBytes();
+      final result = await widget.aiService.analyzeReceiptImage(
+        imageBytes: bytes,
+        wallets: _wallets,
+        categories: _categories,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _isScanningReceipt = false;
+        final amount = result['amount'] as double? ?? 0.0;
+        if (amount > 0) {
+          _amountController.text = amount.toStringAsFixed(0);
+        }
+        final note = result['note'] as String? ?? '';
+        if (note.isNotEmpty) {
+          _noteController.text = note;
+        }
+        final catId = result['categoryId'] as String?;
+        if (catId != null) {
+          _selectedCategoryId = catId;
+        }
+        final walletId = result['walletId'] as String?;
+        if (walletId != null) {
+          _selectedWalletId = walletId;
+        }
+        _type = 'expense';
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${t('receiptLoggedSuccess')} Rp ${_amountController.text}'),
+          backgroundColor: AppTheme.emeraldGreen,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isScanningReceipt = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal memindai struk: $e'), backgroundColor: AppTheme.coralRose),
+        );
+      }
+    }
   }
 
   void _addQuickAmount(double amount) {
@@ -103,8 +278,8 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
     final amount = double.tryParse(_amountController.text.replaceAll('.', '')) ?? 0.0;
     if (amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Masukkan nominal transaksi yang valid.'),
+        SnackBar(
+          content: Text(t('addTxErrAmount')),
           backgroundColor: AppTheme.coralRose,
         ),
       );
@@ -119,7 +294,7 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
       type: _type,
       amount: amount,
       note: _noteController.text.trim().isEmpty
-          ? (_type == 'income' ? 'Pemasukan' : 'Pengeluaran')
+          ? (_type == 'income' ? t('income') : (_type == 'transfer' ? t('transfer') : t('expense')))
           : _noteController.text.trim(),
       date: _selectedDate,
     );
@@ -168,54 +343,75 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
             ),
             const SizedBox(height: 16),
 
-            // Header & Type Switcher
+            // Header & Action Switchers (Voice & Camera)
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Catat Transaksi',
-                  style: TextStyle(
+                Text(
+                  t('addTxTitle'),
+                  style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
                     color: AppTheme.textPrimary,
                   ),
                 ),
-                IconButton(
-                  onPressed: () {
-                    setState(() {
-                      _isVoiceRecording = !_isVoiceRecording;
-                    });
-                  },
-                  icon: Icon(
-                    _isVoiceRecording ? Icons.mic_off : Icons.mic,
-                    color: _isVoiceRecording ? AppTheme.coralRose : AppTheme.violetAI,
-                  ),
-                  tooltip: 'Catat Suara',
+                Row(
+                  children: [
+                    // Tombol Scan Foto Struk
+                    IconButton(
+                      onPressed: _isScanningReceipt ? null : _pickAndScanReceipt,
+                      icon: _isScanningReceipt
+                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.cyanAccent))
+                          : const Icon(Icons.document_scanner_outlined, color: AppTheme.cyanAccent),
+                      tooltip: t('addTxScanTooltip'),
+                    ),
+                    // Tombol Voice
+                    IconButton(
+                      onPressed: _toggleVoiceRecording,
+                      icon: Icon(
+                        _isVoiceRecording ? Icons.mic : Icons.mic_none,
+                        color: _isVoiceRecording ? AppTheme.coralRose : AppTheme.violetAI,
+                      ),
+                      tooltip: t('addTxVoiceTooltip'),
+                    ),
+                  ],
                 ),
               ],
             ),
             const SizedBox(height: 12),
 
-            // Voice Simulation Card (If Active)
+            // Voice Bar Active Indicator
             if (_isVoiceRecording)
               Container(
                 margin: const EdgeInsets.only(bottom: 16),
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: AppTheme.violetAI.withValues(alpha: 0.12),
+                  color: AppTheme.violetAI.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppTheme.violetAI.withValues(alpha: 0.3)),
+                  border: Border.all(color: AppTheme.violetAI.withValues(alpha: 0.4)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Row(
+                    Row(
                       children: [
-                        Icon(Icons.graphic_eq, color: AppTheme.violetAI, size: 20),
-                        SizedBox(width: 8),
+                        const Icon(Icons.graphic_eq, color: AppTheme.violetAI, size: 20),
+                        const SizedBox(width: 8),
                         Text(
-                          'Catat Cepat Pakai Suara / Kalimat',
-                          style: TextStyle(fontWeight: FontWeight.w700, color: AppTheme.textPrimary, fontSize: 13),
+                          t('addTxVoiceHeader'),
+                          style: const TextStyle(fontWeight: FontWeight.w700, color: AppTheme.textPrimary, fontSize: 13),
+                        ),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppTheme.coralRose.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            t('listeningVoice'),
+                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppTheme.coralRose),
+                          ),
                         ),
                       ],
                     ),
@@ -224,7 +420,7 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
                       controller: _voiceInputController,
                       style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
                       decoration: InputDecoration(
-                        hintText: 'Contoh: makan siang 25rb pakai bca',
+                        hintText: t('addTxVoiceHint'),
                         hintStyle: TextStyle(color: AppTheme.textMuted.withValues(alpha: 0.8), fontSize: 12),
                         filled: true,
                         fillColor: AppTheme.surfaceLighter,
@@ -238,8 +434,11 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         TextButton(
-                          onPressed: () => setState(() => _isVoiceRecording = false),
-                          child: const Text('Batal', style: TextStyle(color: AppTheme.textMuted)),
+                          onPressed: () {
+                            SpeechService.instance.stopListening();
+                            setState(() => _isVoiceRecording = false);
+                          },
+                          child: Text(t('cancel'), style: const TextStyle(color: AppTheme.textMuted)),
                         ),
                         const SizedBox(width: 8),
                         ElevatedButton(
@@ -249,7 +448,7 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
-                          child: const Text('Terapkan', style: TextStyle(fontWeight: FontWeight.w700)),
+                          child: Text(t('apply'), style: const TextStyle(fontWeight: FontWeight.w700)),
                         ),
                       ],
                     )
@@ -267,18 +466,18 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
               padding: const EdgeInsets.all(4),
               child: Row(
                 children: [
-                  _buildTypeTab('expense', 'Pengeluaran', isExpense ? AppTheme.coralRose : null),
-                  _buildTypeTab('income', 'Pemasukan', isIncome ? AppTheme.emeraldGreen : null),
-                  _buildTypeTab('transfer', 'Transfer', isTransfer ? AppTheme.cyanAccent : null),
+                  _buildTypeTab('expense', t('expense'), isExpense ? AppTheme.coralRose : null),
+                  _buildTypeTab('income', t('income'), isIncome ? AppTheme.emeraldGreen : null),
+                  _buildTypeTab('transfer', t('transfer'), isTransfer ? AppTheme.cyanAccent : null),
                 ],
               ),
             ),
             const SizedBox(height: 20),
 
             // Amount Input Field
-            const Text(
-              'Nominal (Rp)',
-              style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w600),
+            Text(
+              t('addTxAmount'),
+              style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 6),
             TextField(
@@ -348,7 +547,7 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        isTransfer ? 'Dari Dompet' : 'Dompet / Rekening',
+                        isTransfer ? t('addTxFromWallet') : t('addTxWallet'),
                         style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 6),
@@ -385,9 +584,9 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Ke Dompet',
-                          style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w600),
+                        Text(
+                          t('addTxToWallet'),
+                          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 6),
                         Container(
@@ -426,9 +625,9 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
 
             // Category Selection (Only if not transfer)
             if (!isTransfer) ...[
-              const Text(
-                'Kategori',
-                style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w600),
+              Text(
+                t('addTxCategory'),
+                style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
               SizedBox(
@@ -471,16 +670,16 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
             ],
 
             // Note Input
-            const Text(
-              'Catatan / Keterangan',
-              style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w600),
+            Text(
+              t('addTxNote'),
+              style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 6),
             TextField(
               controller: _noteController,
               style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
               decoration: InputDecoration(
-                hintText: 'Contoh: Makan siang, bayar wifi, dll.',
+                hintText: t('addTxNoteHint'),
                 hintStyle: TextStyle(color: AppTheme.textMuted.withValues(alpha: 0.7), fontSize: 13),
                 filled: true,
                 fillColor: AppTheme.surfaceLighter,
@@ -508,7 +707,9 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
                 child: Text(
-                  isTransfer ? 'Simpan Transfer' : (isExpense ? 'Simpan Pengeluaran' : 'Simpan Pemasukan'),
+                  isTransfer
+                      ? t('addTxSaveTransfer')
+                      : (isExpense ? t('addTxSaveExpense') : t('addTxSaveIncome')),
                   style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                 ),
               ),

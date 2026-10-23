@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class AuthService {
   static const String _keyUsername = 'iritot_auth_username';
   static const String _keyPassword = 'iritot_auth_password';
+  static const String _keyDisplayName = 'iritot_auth_display_name';
   static const String _keyIsLoggedIn = 'iritot_auth_is_logged_in';
   static const String _keyRememberMe = 'iritot_auth_remember_me';
   static const String _keyLastActiveTimestamp = 'iritot_auth_last_active_timestamp';
@@ -10,7 +11,8 @@ class AuthService {
   // Batas waktu sesi di latar belakang: 5 menit (300.000 milidetik)
   static const int sessionTimeoutMs = 5 * 60 * 1000;
 
-  static const String defaultUsername = 'usertest';
+  static const String defaultUsername = 'NewUser';
+  static const String defaultDisplayName = 'NewUser';
   static const String defaultPassword = 'iritot123';
 
   final SharedPreferences _prefs;
@@ -25,8 +27,12 @@ class AuthService {
   }
 
   Future<void> _initDefaultCredentialsIfNeeded() async {
-    if (!_prefs.containsKey(_keyUsername)) {
+    final currentUsername = _prefs.getString(_keyUsername);
+    if (currentUsername == null || currentUsername == 'usertest') {
       await _prefs.setString(_keyUsername, defaultUsername);
+    }
+    if (!_prefs.containsKey(_keyDisplayName)) {
+      await _prefs.setString(_keyDisplayName, defaultDisplayName);
     }
     if (!_prefs.containsKey(_keyPassword)) {
       await _prefs.setString(_keyPassword, defaultPassword);
@@ -35,6 +41,16 @@ class AuthService {
 
   String getUsername() {
     return _prefs.getString(_keyUsername) ?? defaultUsername;
+  }
+
+  String getDisplayName() {
+    final name = _prefs.getString(_keyDisplayName);
+    if (name != null && name.trim().isNotEmpty) return name;
+    return getUsername();
+  }
+
+  Future<void> setDisplayName(String displayName) async {
+    await _prefs.setString(_keyDisplayName, displayName.trim());
   }
 
   String _getPassword() {
@@ -84,10 +100,13 @@ class AuthService {
   }
 
   Future<bool> login(String username, String password, {bool rememberMe = true}) async {
-    final currentUsername = getUsername();
+    final currentUsername = getUsername().trim().toLowerCase();
+    final inputUser = username.trim().toLowerCase();
     final currentPassword = _getPassword();
 
-    if (username.trim() == currentUsername && password == currentPassword) {
+    final matchesUser = inputUser == currentUsername || (currentUsername == 'newuser' && inputUser == 'usertest');
+
+    if (matchesUser && password == currentPassword) {
       await _prefs.setBool(_keyIsLoggedIn, true);
       await _prefs.setBool(_keyRememberMe, rememberMe);
       await updateLastActiveTimestamp();
@@ -101,18 +120,72 @@ class AuthService {
     await _prefs.remove(_keyLastActiveTimestamp);
   }
 
-  // Validasi dan Ubah Username & Password
+  // Update profil: Nama Tampilan, Username, dan opsional Password
+  Future<Map<String, dynamic>> updateProfile({
+    required String newDisplayName,
+    required String newUsername,
+    String? oldPassword,
+    String? newPassword,
+  }) async {
+    final trimmedName = newDisplayName.trim();
+    final trimmedUser = newUsername.trim();
+
+    if (trimmedName.isEmpty) {
+      return {
+        'success': false,
+        'message': 'Nama tampilan tidak boleh kosong.',
+      };
+    }
+
+    if (trimmedUser.isEmpty) {
+      return {
+        'success': false,
+        'message': 'Username akun tidak boleh kosong.',
+      };
+    }
+
+    if (newPassword != null && newPassword.isNotEmpty) {
+      final currentPassword = _getPassword();
+      if (oldPassword == null || oldPassword != currentPassword) {
+        return {
+          'success': false,
+          'message': 'Kata sandi saat ini salah.',
+        };
+      }
+      if (newPassword.length < 4) {
+        return {
+          'success': false,
+          'message': 'Kata sandi baru minimal 4 karakter.',
+        };
+      }
+      await _prefs.setString(_keyPassword, newPassword);
+    }
+
+    await _prefs.setString(_keyDisplayName, trimmedName);
+    await _prefs.setString(_keyUsername, trimmedUser);
+
+    return {
+      'success': true,
+      'message': 'Profil berhasil diperbarui!',
+    };
+  }
+
+  // Validasi dan Ubah Username & Password (kompatibilitas lama)
   Future<Map<String, dynamic>> changeCredentials({
     required String oldUsername,
     required String oldPassword,
     required String newUsername,
     required String newPassword,
+    String? newDisplayName,
   }) async {
     final currentUsername = getUsername();
     final currentPassword = _getPassword();
 
     // 1. Validasi kredensial lama
-    if (oldUsername.trim() != currentUsername) {
+    final matchesOldUser = oldUsername.trim().toLowerCase() == currentUsername.toLowerCase() ||
+        (currentUsername.toLowerCase() == 'newuser' && oldUsername.trim().toLowerCase() == 'usertest');
+
+    if (!matchesOldUser) {
       return {
         'success': false,
         'message': 'Username lama tidak sesuai.',
@@ -144,6 +217,9 @@ class AuthService {
     // 3. Simpan kredensial baru ke database lokal
     await _prefs.setString(_keyUsername, newUsername.trim());
     await _prefs.setString(_keyPassword, newPassword);
+    if (newDisplayName != null && newDisplayName.trim().isNotEmpty) {
+      await _prefs.setString(_keyDisplayName, newDisplayName.trim());
+    }
 
     return {
       'success': true,

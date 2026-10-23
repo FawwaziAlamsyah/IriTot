@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:image_picker/image_picker.dart';
 import '../models/transaction_item.dart';
 import '../models/category.dart';
 import '../models/budget.dart';
@@ -11,10 +12,12 @@ import 'add_transaction_modal.dart';
 import 'budget_screen.dart';
 import 'savings_screen.dart';
 import '../services/locale_service.dart';
+import '../services/auth_service.dart';
 
 class HomeScreen extends StatefulWidget {
   final StorageService storageService;
   final AiService aiService;
+  final AuthService? authService;
   final LocaleService? localeService;
   final VoidCallback onDataChanged;
   final Function(int) onNavigateToTab;
@@ -26,6 +29,7 @@ class HomeScreen extends StatefulWidget {
     super.key,
     required this.storageService,
     required this.aiService,
+    this.authService,
     this.localeService,
     required this.onDataChanged,
     required this.onNavigateToTab,
@@ -143,7 +147,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  void _openAddModal({String? initialType, bool openWithVoice = false}) {
+  void _openAddModal({
+    String? initialType,
+    bool openWithVoice = false,
+    double? initialAmount,
+    String? initialNote,
+    String? initialCategoryId,
+    String? initialWalletId,
+  }) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -151,8 +162,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       builder: (context) => AddTransactionModal(
         storageService: widget.storageService,
         aiService: widget.aiService,
+        localeService: widget.localeService,
         initialType: initialType,
         openWithVoice: openWithVoice,
+        initialAmount: initialAmount,
+        initialNote: initialNote,
+        initialCategoryId: initialCategoryId,
+        initialWalletId: initialWalletId,
         onTransactionAdded: () {
           setState(() {});
           widget.onDataChanged();
@@ -162,64 +178,132 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   void _showScanReceiptDialog() {
-    showDialog(
+    final t = widget.localeService?.t ?? (String k) => k;
+    showModalBottomSheet(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: AppTheme.surfaceDark,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: const BorderSide(color: AppTheme.borderDark)),
-          title: const Row(
-            children: [
-              Icon(Icons.receipt_long, color: AppTheme.cyanAccent),
-              SizedBox(width: 8),
-              Text('Scan Foto Struk', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Fitur OCR Struk membaca struk belanja langsung secara offline di perangkat.',
-                style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppTheme.surfaceLighter,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppTheme.borderDark),
-                ),
-                child: const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      backgroundColor: AppTheme.surfaceDark,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
                   children: [
-                    Text('Simulasi Deteksi Struk Terakhir:', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
-                    SizedBox(height: 4),
-                    Text('Toko: Superindo Minimarket', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
-                    Text('Total: Rp 114.500', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppTheme.coralRose)),
+                    const Icon(Icons.receipt_long, color: AppTheme.cyanAccent),
+                    const SizedBox(width: 8),
+                    Text(
+                      t('scanReceiptTitle'),
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+                    ),
                   ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 8),
+                Text(
+                  t('scanReceiptDesc'),
+                  style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+                ),
+                const SizedBox(height: 16),
+                ListTile(
+                  leading: const Icon(Icons.camera_alt_outlined, color: AppTheme.cyanAccent),
+                  title: Text(t('takePhoto'), style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _pickReceipt(ImageSource.camera);
+                  },
+                ),
+                const Divider(color: AppTheme.borderDark, height: 1),
+                ListTile(
+                  leading: const Icon(Icons.photo_library_outlined, color: AppTheme.emeraldGreen),
+                  title: Text(t('chooseGallery'), style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _pickReceipt(ImageSource.gallery);
+                  },
+                ),
+              ],
+            ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Tutup', style: TextStyle(color: AppTheme.textMuted)),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _openAddModal(initialType: 'expense');
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.cyanAccent, foregroundColor: Colors.black),
-              child: const Text('Buat Transaksi', style: TextStyle(fontWeight: FontWeight.w700)),
-            ),
-          ],
         );
       },
     );
+  }
+
+  void _pickReceipt(ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final file = await picker.pickImage(source: source);
+      if (file == null) return;
+
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => const Center(
+          child: Card(
+            color: AppTheme.surfaceDark,
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(color: AppTheme.cyanAccent),
+                  SizedBox(height: 16),
+                  Text('Memindai struk dengan AI...', style: TextStyle(color: AppTheme.textPrimary, fontSize: 14)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final bytes = await file.readAsBytes();
+      final result = await widget.aiService.analyzeReceiptImage(
+        imageBytes: bytes,
+        wallets: widget.storageService.getWallets(),
+        categories: widget.storageService.getCategories(),
+      );
+
+      if (mounted) {
+        Navigator.pop(context); // pop loading dialog
+      }
+
+      final amount = result['amount'] as double? ?? 0.0;
+      final note = result['note'] as String? ?? result['merchant'] as String? ?? '';
+      final categoryId = result['categoryId'] as String?;
+      final walletId = result['walletId'] as String?;
+
+      if (mounted) {
+        _openAddModal(
+          initialType: 'expense',
+          initialAmount: amount > 0 ? amount : null,
+          initialNote: note.isNotEmpty ? note : null,
+          initialCategoryId: categoryId,
+          initialWalletId: walletId,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal membaca struk: $e'), backgroundColor: AppTheme.coralRose),
+        );
+      }
+    }
+  }
+
+  String _getInitials(String name) {
+    final clean = name.trim();
+    if (clean.isEmpty) return 'NU';
+    final parts = clean.split(' ').where((p) => p.isNotEmpty).toList();
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    return clean.substring(0, clean.length >= 2 ? 2 : 1).toUpperCase();
   }
 
   @override
@@ -268,10 +352,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                             ),
                           ],
                         ),
-                        child: const Center(
+                        child: Center(
                           child: Text(
-                            'FA',
-                            style: TextStyle(
+                            _getInitials(widget.authService?.getDisplayName() ?? 'NewUser'),
+                            style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w900,
                               color: Colors.black,
@@ -280,58 +364,70 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         ),
                       ),
                       const SizedBox(width: 10),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(5),
-                                child: Image.asset(
-                                  'assets/images/app_logo.png',
-                                  width: 18,
-                                  height: 18,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              const Text(
-                                'IRITOT',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 0.5,
-                                  color: AppTheme.textPrimary,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.surfaceLighter,
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: AppTheme.borderDark),
-                                ),
-                                child: Text(
-                                  widget.localeService?.t('personalBadge') ?? 'PERSONAL',
-                                  style: const TextStyle(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppTheme.cyanAccent,
+                      GestureDetector(
+                        onTap: () {
+                          // Klik header nama untuk membuka menu profil di Pengaturan
+                          widget.onNavigateToTab(4);
+                        },
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(5),
+                                  child: Image.asset(
+                                    'assets/images/app_logo.png',
+                                    width: 18,
+                                    height: 18,
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 2),
-                          const Text(
-                            'Fawwazi Alamsyah',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: AppTheme.textMuted,
-                              fontWeight: FontWeight.w500,
+                                const SizedBox(width: 6),
+                                const Text(
+                                  'IRITOT',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.5,
+                                    color: AppTheme.textPrimary,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.surfaceLighter,
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: AppTheme.borderDark),
+                                  ),
+                                  child: Text(
+                                    widget.localeService?.t('personalBadge') ?? 'PERSONAL',
+                                    style: const TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppTheme.cyanAccent,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 2),
+                            Row(
+                              children: [
+                                Text(
+                                  widget.authService?.getDisplayName() ?? 'NewUser',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: AppTheme.textMuted,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                const Icon(Icons.edit_outlined, size: 10, color: AppTheme.textMuted),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),

@@ -21,6 +21,57 @@
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
+  <script>
+    window.iritotSpeech = {
+      recognition: null,
+      isListening: false,
+      start: function(onResultCallback, onEndCallback, onErrorCallback) {
+        var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+          if (onErrorCallback) onErrorCallback("Browser ini belum mendukung Web Speech Recognition.");
+          return false;
+        }
+        try {
+          if (this.recognition) {
+            this.recognition.abort();
+          }
+          var rec = new SpeechRecognition();
+          rec.lang = 'id-ID';
+          rec.continuous = false;
+          rec.interimResults = true;
+          rec.onresult = function(event) {
+            var text = '';
+            for (var i = 0; i < event.results.length; i++) {
+              text += event.results[i][0].transcript;
+            }
+            if (onResultCallback) onResultCallback(text);
+          };
+          rec.onend = function() {
+            window.iritotSpeech.isListening = false;
+            if (onEndCallback) onEndCallback();
+          };
+          rec.onerror = function(err) {
+            window.iritotSpeech.isListening = false;
+            if (onErrorCallback) onErrorCallback(err.error || "Speech error");
+          };
+          this.recognition = rec;
+          this.isListening = true;
+          rec.start();
+          return true;
+        } catch (e) {
+          this.isListening = false;
+          if (onErrorCallback) onErrorCallback(e.toString());
+          return false;
+        }
+      },
+      stop: function() {
+        if (this.recognition) {
+          this.recognition.stop();
+        }
+        this.isListening = false;
+      }
+    };
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

@@ -5,6 +5,8 @@ import 'package:iritot/models/wallet.dart';
 import 'package:iritot/models/category.dart';
 import 'package:iritot/models/transaction_item.dart';
 import 'package:iritot/models/savings_pocket.dart';
+import 'package:iritot/services/csv_service.dart';
+import 'package:iritot/services/ai_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -137,5 +139,131 @@ void main() {
     expect(records.length, 1);
     expect(records.first.amount, 200000);
     expect(records.first.isOut, true);
+  });
+
+  test('CSV Export and Import cycle restores transactions correctly', () async {
+    final storage = await StorageService.init();
+    final wallets = storage.getWallets();
+    final categories = storage.getCategories();
+
+    final tx1 = TransactionItem(
+      id: 'tx_csv_1',
+      walletId: wallets.first.id,
+      categoryId: categories.first.id,
+      amount: 75000,
+      type: 'expense',
+      note: 'Makan bareng teman',
+      date: DateTime(2026, 10, 20, 12, 30, 0),
+    );
+
+    final csvText = CsvService.exportTransactionsToCsv(
+      transactions: [tx1],
+      wallets: wallets,
+      categories: categories,
+    );
+
+    expect(csvText.contains('tx_csv_1'), true);
+    expect(csvText.contains('75000'), true);
+    expect(csvText.contains('Makan bareng teman'), true);
+
+    // Parse back
+    final restored = CsvService.parseCsvToTransactions(
+      csvString: csvText,
+      wallets: wallets,
+      categories: categories,
+    );
+
+    expect(restored.length, 1);
+    expect(restored.first.id, 'tx_csv_1');
+    expect(restored.first.amount, 75000);
+    expect(restored.first.note, 'Makan bareng teman');
+    expect(restored.first.type, 'expense');
+  });
+
+  test('StorageService importTransactions handles duplicates and wallet balance update', () async {
+    final storage = await StorageService.init();
+    final wallet = storage.getWallets().first;
+    wallet.balance = 1000000;
+    await storage.saveWallets([wallet]);
+
+    final item1 = TransactionItem(
+      id: 'tx_imp_1',
+      walletId: wallet.id,
+      categoryId: 'cat_food',
+      amount: 50000,
+      type: 'expense',
+      note: 'Imported lunch',
+      date: DateTime.now(),
+    );
+
+    final item2 = TransactionItem(
+      id: 'tx_imp_2',
+      walletId: wallet.id,
+      categoryId: 'cat_food',
+      amount: 200000,
+      type: 'income',
+      note: 'Imported freelance',
+      date: DateTime.now(),
+    );
+
+    // Initial import of 2 transactions
+    final importedCount = await storage.importTransactions([item1, item2], skipDuplicates: true);
+    expect(importedCount, 2);
+    expect(storage.getTransactions().length, 2);
+
+    // Wallet balance updated: 1,000,000 - 50,000 + 200,000 = 1,150,000
+    expect(storage.getWallets().first.balance, 1150000);
+
+    // Re-importing with skipDuplicates=true should import 0 items and leave balance intact
+    final reimportedCount = await storage.importTransactions([item1, item2], skipDuplicates: true);
+    expect(reimportedCount, 0);
+    expect(storage.getTransactions().length, 2);
+    expect(storage.getWallets().first.balance, 1150000);
+  });
+
+  test('AiService detects transaction intent from voice and chat query', () async {
+    final ai = await AiService.init();
+    final storage = await StorageService.init();
+    final wallets = storage.getWallets();
+    final categories = storage.getCategories();
+
+    // Query 1: Expense with 'catat'
+    final res1 = ai.detectTransactionFromQuery(
+      query: 'Catat beli nasi goreng 25000 pakai kas',
+      wallets: wallets,
+      categories: categories,
+    );
+    expect(res1, isNotNull);
+    expect(res1!['amount'], 25000);
+    expect(res1['type'], 'expense');
+    expect(res1['categoryId'], 'cat_food');
+
+    // Query 2: Income
+    final res2 = ai.detectTransactionFromQuery(
+      query: 'Dapat gaji bulanan 5000000',
+      wallets: wallets,
+      categories: categories,
+    );
+    expect(res2, isNotNull);
+    expect(res2!['amount'], 5000000);
+    expect(res2['type'], 'income');
+
+    // Query 3: Non-transaction query should return null
+    final res3 = ai.detectTransactionFromQuery(
+      query: 'Bagaimana cara berhemat bulan ini?',
+      wallets: wallets,
+      categories: categories,
+    );
+    expect(res3, isNull);
+
+    // Multimodal receipt analysis offline fallback
+    final receiptRes = await ai.analyzeReceiptImage(
+      imageBytes: [1, 2, 3],
+      wallets: wallets,
+      categories: categories,
+    );
+    expect(receiptRes['success'], isTrue);
+    expect(receiptRes.containsKey('merchant'), isTrue);
+    expect(receiptRes.containsKey('amount'), isTrue);
   });
 }
