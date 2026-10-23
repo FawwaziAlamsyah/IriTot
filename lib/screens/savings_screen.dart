@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../models/savings_pocket.dart';
 import '../services/storage_service.dart';
+import '../services/csv_service.dart';
+import '../services/file_io_service.dart';
 import '../theme/app_theme.dart';
 
 import '../services/locale_service.dart';
@@ -1253,6 +1256,11 @@ class _SavingsScreenState extends State<SavingsScreen> {
               icon: Icon(_effectiveBalanceHidden ? Icons.visibility_off : Icons.visibility, color: AppTheme.textSecondary, size: 20),
               tooltip: 'Balance Privacy',
             ),
+            IconButton(
+              onPressed: _showImportSavingsCsvDialog,
+              icon: const Icon(Icons.file_upload_outlined, color: AppTheme.emeraldGreen, size: 20),
+              tooltip: 'Import Pocket CSV',
+            ),
           ],
         ),
         body: SafeArea(
@@ -1262,6 +1270,243 @@ class _SavingsScreenState extends State<SavingsScreen> {
     }
 
     return scrollContent;
+  }
+
+  void _showImportSavingsCsvDialog() {
+    final csvCtrl = TextEditingController();
+    bool skipDuplicates = true;
+    ParsedSavingsCsv? preview;
+    String? validationMsg;
+
+    void updatePreview(String text, StateSetter setModalState) {
+      if (text.trim().isEmpty) {
+        setModalState(() {
+          preview = null;
+          validationMsg = null;
+        });
+        return;
+      }
+
+      final parsed = CsvService.parseCsvToSavings(text);
+      setModalState(() {
+        preview = parsed;
+        if (parsed.pockets.isEmpty && parsed.records.isEmpty) {
+          validationMsg = t('importNoValid');
+        } else {
+          final pocketNames = parsed.pockets.map((p) => p.name).join(', ');
+          validationMsg = '${t('importPocketDetected').replaceAll('{pockets}', '${parsed.pockets.length}').replaceAll('{count}', '${parsed.records.length}')}\n($pocketNames)';
+        }
+      });
+    }
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          final isValid = preview != null && (preview!.pockets.isNotEmpty || preview!.records.isNotEmpty);
+          return AlertDialog(
+            backgroundColor: AppTheme.surfaceDark,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: const BorderSide(color: AppTheme.borderDark),
+            ),
+            title: Row(
+              children: [
+                const Icon(Icons.file_upload_outlined, color: AppTheme.emeraldGreen, size: 22),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    widget.localeService?.isIndonesian == true ? 'Import Data Tabungan' : 'Import Pocket Data',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+                  ),
+                ),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.localeService?.isIndonesian == true
+                        ? 'Pilih file CSV tabungan/pocket untuk memuat pos kantong dan riwayat setor/tarik.'
+                        : 'Choose a pocket CSV file to import savings pockets and their records.',
+                    style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        try {
+                          final text = await FileIoService.pickCsvText();
+                          if (text == null) return;
+                          csvCtrl.text = text;
+                          updatePreview(text, setModalState);
+                        } catch (e) {
+                          setModalState(() => validationMsg = '${t('csvReadFailed')} $e');
+                        }
+                      },
+                      icon: const Icon(Icons.folder_open_rounded, size: 18),
+                      label: Text(t('chooseCsvFile'), style: const TextStyle(fontWeight: FontWeight.w700)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.emeraldGreen,
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(t('orPasteCsv'), style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: csvCtrl,
+                    maxLines: 4,
+                    style: const TextStyle(color: AppTheme.textPrimary, fontSize: 11, fontFamily: 'monospace'),
+                    decoration: InputDecoration(
+                      hintText: 'ID,Tanggal,Kantong,Tipe,Nominal,Catatan,Saldo_Akhir\n...',
+                      hintStyle: TextStyle(color: AppTheme.textMuted.withValues(alpha: 0.5), fontSize: 11),
+                      filled: true,
+                      fillColor: AppTheme.surfaceLighter,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.borderDark)),
+                      contentPadding: const EdgeInsets.all(12),
+                    ),
+                    onChanged: (val) => updatePreview(val, setModalState),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          final data = await Clipboard.getData(Clipboard.kTextPlain);
+                          if (data?.text != null && data!.text!.trim().isNotEmpty) {
+                            csvCtrl.text = data.text!;
+                            updatePreview(data.text!, setModalState);
+                          }
+                        },
+                        icon: const Icon(Icons.paste, size: 14, color: AppTheme.cyanAccent),
+                        label: Text(
+                          widget.localeService?.isIndonesian == true ? 'Tempel dari Clipboard' : 'Paste from Clipboard',
+                          style: const TextStyle(fontSize: 11, color: AppTheme.cyanAccent),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: AppTheme.borderDark),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          minimumSize: Size.zero,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      if (csvCtrl.text.isNotEmpty)
+                        TextButton(
+                          onPressed: () {
+                            csvCtrl.clear();
+                            updatePreview('', setModalState);
+                          },
+                          child: Text(t('clear'), style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                        ),
+                    ],
+                  ),
+                  if (validationMsg != null) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isValid
+                            ? AppTheme.emeraldGreen.withValues(alpha: 0.12)
+                            : AppTheme.coralRose.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isValid
+                              ? AppTheme.emeraldGreen.withValues(alpha: 0.3)
+                              : AppTheme.coralRose.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            isValid ? Icons.check_circle_outline : Icons.warning_amber_rounded,
+                            size: 16,
+                            color: isValid ? AppTheme.emeraldGreen : AppTheme.coralRose,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              validationMsg!,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: isValid ? AppTheme.emeraldGreen : AppTheme.coralRose,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 10),
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    value: skipDuplicates,
+                    activeColor: AppTheme.emeraldGreen,
+                    title: Text(
+                      widget.localeService?.isIndonesian == true
+                          ? 'Lewati duplikat catatan yang sudah ada'
+                          : 'Skip existing duplicate records',
+                      style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                    ),
+                    onChanged: (val) => setModalState(() => skipDuplicates = val ?? true),
+                    controlAffinity: ListTileControlAffinity.leading,
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogCtx),
+                child: Text(t('cancel'), style: const TextStyle(color: AppTheme.textMuted)),
+              ),
+              ElevatedButton.icon(
+                onPressed: isValid
+                    ? () async {
+                        Navigator.pop(dialogCtx);
+                        final count = await widget.storageService.importSavingsData(
+                          newPockets: preview!.pockets,
+                          newRecords: preview!.records,
+                          skipDuplicates: skipDuplicates,
+                        );
+                        if (mounted) {
+                          setState(() {});
+                          widget.onDataChanged();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(t('importPocketSuccess').replaceAll('{pockets}', '${preview!.pockets.length}').replaceAll('{count}', '$count')),
+                              backgroundColor: AppTheme.emeraldGreen,
+                            ),
+                          );
+                        }
+                      }
+                    : null,
+                icon: const Icon(Icons.file_upload, size: 16),
+                label: Text(
+                  widget.localeService?.isIndonesian == true ? 'Import Sekarang' : 'Import Now',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.emeraldGreen,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: AppTheme.surfaceLighter,
+                  disabledForegroundColor: AppTheme.textMuted,
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   Widget _buildFilterChip(String val, String label) {

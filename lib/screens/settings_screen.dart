@@ -6,6 +6,7 @@ import '../models/category.dart';
 import '../models/transaction_item.dart';
 import '../services/storage_service.dart';
 import '../services/csv_service.dart';
+import '../services/file_io_service.dart';
 import '../services/ai_service.dart';
 import '../services/auth_service.dart';
 import '../services/locale_service.dart';
@@ -418,61 +419,159 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final transactions = widget.storageService.getTransactions();
     final wallets = widget.storageService.getWallets();
     final categories = widget.storageService.getCategories();
+    final pockets = widget.storageService.getSavingsPockets();
+    final records = widget.storageService.getSavingsRecords();
 
-    final csvString = CsvService.exportTransactionsToCsv(
+    final txCsv = CsvService.exportTransactionsToCsv(
       transactions: transactions,
       wallets: wallets,
       categories: categories,
     );
+    final pocketCsv = CsvService.exportSavingsToCsv(pockets: pockets, records: records);
+
+    String target = 'transactions';
+    bool isSaving = false;
 
     showDialog(
       context: context,
       builder: (dialogCtx) {
-        return AlertDialog(
-          backgroundColor: AppTheme.surfaceDark,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: const BorderSide(color: AppTheme.borderDark)),
-          title: Text(t('exportModalTitle'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('${transactions.length} transaksi siap diekspor ke format CSV universal.', style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
-              const SizedBox(height: 12),
-              Container(
-                height: 120,
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: AppTheme.surfaceLighter,
+        return StatefulBuilder(
+          builder: (builderCtx, setModalState) {
+            final isTx = target == 'transactions';
+            final csvString = isTx ? txCsv : pocketCsv;
+            final count = isTx ? transactions.length : records.length;
+            final summary = isTx
+                ? t('exportTxSummary').replaceAll('{count}', '$count')
+                : t('exportPocketSummary')
+                    .replaceAll('{count}', '$count')
+                    .replaceAll('{pockets}', '${pockets.length}');
+
+            Widget segment(String value, String label, IconData icon) {
+              final selected = target == value;
+              return Expanded(
+                child: InkWell(
+                  onTap: () => setModalState(() => target = value),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppTheme.borderDark),
-                ),
-                child: SingleChildScrollView(
-                  child: Text(
-                    csvString,
-                    style: const TextStyle(fontSize: 10, fontFamily: 'monospace', color: AppTheme.textMuted),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: selected ? AppTheme.emeraldGreen.withValues(alpha: 0.15) : AppTheme.surfaceLighter,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: selected ? AppTheme.emeraldGreen : AppTheme.borderDark),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(icon, size: 16, color: selected ? AppTheme.emeraldGreen : AppTheme.textMuted),
+                        const SizedBox(width: 6),
+                        Text(
+                          label,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                            color: selected ? AppTheme.emeraldGreen : AppTheme.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
+              );
+            }
+
+            return AlertDialog(
+              backgroundColor: AppTheme.surfaceDark,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: const BorderSide(color: AppTheme.borderDark)),
+              title: Text(t('exportModalTitle'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      segment('transactions', t('exportTargetTx'), Icons.receipt_long_outlined),
+                      const SizedBox(width: 8),
+                      segment('pockets', t('exportTargetPocket'), Icons.savings_outlined),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(summary, style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                  const SizedBox(height: 10),
+                  Container(
+                    height: 110,
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surfaceLighter,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppTheme.borderDark),
+                    ),
+                    child: SingleChildScrollView(
+                      child: Text(
+                        csvString,
+                        style: const TextStyle(fontSize: 10, fontFamily: 'monospace', color: AppTheme.textMuted),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: csvString));
+                        Navigator.pop(dialogCtx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(t('csvCopied')), backgroundColor: AppTheme.emeraldGreen),
+                        );
+                      },
+                      icon: const Icon(Icons.copy, size: 14, color: AppTheme.cyanAccent),
+                      label: Text(t('copyCsv'), style: const TextStyle(fontSize: 12, color: AppTheme.cyanAccent)),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogCtx),
-              child: Text(t('cancel'), style: const TextStyle(color: AppTheme.textMuted)),
-            ),
-            ElevatedButton.icon(
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: csvString));
-                Navigator.pop(dialogCtx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(t('csvCopied')), backgroundColor: AppTheme.emeraldGreen),
-                );
-              },
-              icon: const Icon(Icons.copy, size: 16),
-              label: Text(t('copyCsv')),
-              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.cyanAccent, foregroundColor: Colors.black),
-            ),
-          ],
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogCtx),
+                  child: Text(t('cancel'), style: const TextStyle(color: AppTheme.textMuted)),
+                ),
+                ElevatedButton.icon(
+                  onPressed: (count == 0 || isSaving)
+                      ? null
+                      : () async {
+                          setModalState(() => isSaving = true);
+                          final messenger = ScaffoldMessenger.of(context);
+                          try {
+                            final name = FileIoService.datedName(isTx ? 'iritot_transactions' : 'iritot_pockets');
+                            await FileIoService.saveCsv(baseName: name, csv: csvString);
+                            if (dialogCtx.mounted) Navigator.pop(dialogCtx);
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Text(t('csvDownloaded').replaceAll('{file}', '$name.csv')),
+                                backgroundColor: AppTheme.emeraldGreen,
+                              ),
+                            );
+                          } catch (e) {
+                            setModalState(() => isSaving = false);
+                            messenger.showSnackBar(
+                              SnackBar(content: Text('${t('csvSaveFailed')} $e'), backgroundColor: AppTheme.coralRose),
+                            );
+                          }
+                        },
+                  icon: isSaving
+                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                      : const Icon(Icons.download_rounded, size: 16),
+                  label: Text(t('downloadCsv'), style: const TextStyle(fontWeight: FontWeight.w700)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.emeraldGreen,
+                    foregroundColor: Colors.black,
+                    disabledBackgroundColor: AppTheme.surfaceLighter,
+                    disabledForegroundColor: AppTheme.textMuted,
+                  ),
+                ),
+              ],
+            );
+          },
         );
       },
     );
@@ -483,19 +582,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final csvCtrl = TextEditingController();
     bool skipDuplicates = true;
     List<TransactionItem> previewItems = [];
+    ParsedSavingsCsv? previewSavings;
+    bool isSavings = false;
     String? validationMsg;
 
     void updatePreview(String text, StateSetter setModalState) {
-      final wallets = widget.storageService.getWallets();
-      final categories = widget.storageService.getCategories();
       if (text.trim().isEmpty) {
         setModalState(() {
           previewItems = [];
+          previewSavings = null;
+          isSavings = false;
           validationMsg = null;
         });
         return;
       }
 
+      if (CsvService.isSavingsCsv(text)) {
+        final parsed = CsvService.parseCsvToSavings(text);
+        setModalState(() {
+          isSavings = true;
+          previewSavings = parsed;
+          previewItems = [];
+          if (parsed.pockets.isEmpty && parsed.records.isEmpty) {
+            validationMsg = t('importNoValid');
+          } else {
+            validationMsg = t('importPocketDetected').replaceAll('{pockets}', '${parsed.pockets.length}').replaceAll('{count}', '${parsed.records.length}');
+          }
+        });
+        return;
+      }
+
+      final wallets = widget.storageService.getWallets();
+      final categories = widget.storageService.getCategories();
       final parsed = CsvService.parseCsvToTransactions(
         csvString: text,
         wallets: wallets,
@@ -503,13 +621,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
       );
 
       setModalState(() {
+        isSavings = false;
+        previewSavings = null;
         previewItems = parsed;
         if (parsed.isEmpty) {
           validationMsg = t('importNoValid');
         } else {
           final expCount = parsed.where((item) => item.type == 'expense').length;
           final incCount = parsed.where((item) => item.type == 'income').length;
-          validationMsg = '${parsed.length} ${t('importValidDetected')} ($expCount pengeluaran, $incCount pemasukan)';
+          validationMsg = '${parsed.length} ${t('importValidDetected')} ($expCount ${t('importExpenseWord')}, $incCount ${t('importIncomeWord')})';
         }
       });
     }
@@ -519,7 +639,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (dialogCtx) {
         return StatefulBuilder(
           builder: (builderCtx, setModalState) {
-            final isValid = previewItems.isNotEmpty;
+            final isValid = previewItems.isNotEmpty || (previewSavings != null && (previewSavings!.pockets.isNotEmpty || previewSavings!.records.isNotEmpty));
             return AlertDialog(
               backgroundColor: AppTheme.surfaceDark,
               shape: RoundedRectangleBorder(
@@ -548,9 +668,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                     ),
                     const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          try {
+                            final text = await FileIoService.pickCsvText();
+                            if (text == null) return;
+                            csvCtrl.text = text;
+                            updatePreview(text, setModalState);
+                          } catch (e) {
+                            setModalState(() => validationMsg = '${t('csvReadFailed')} $e');
+                          }
+                        },
+                        icon: const Icon(Icons.folder_open_rounded, size: 18),
+                        label: Text(t('chooseCsvFile'), style: const TextStyle(fontWeight: FontWeight.w700)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.emeraldGreen,
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      t('orPasteCsv'),
+                      style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                    ),
+                    const SizedBox(height: 6),
                     TextField(
                       controller: csvCtrl,
-                      maxLines: 5,
+                      maxLines: 4,
                       style: const TextStyle(color: AppTheme.textPrimary, fontSize: 11, fontFamily: 'monospace'),
                       decoration: InputDecoration(
                         hintText: 'ID,Tanggal,Tipe,Dompet,Kategori,Nominal,Keterangan\n...',
@@ -588,7 +737,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               csvCtrl.clear();
                               updatePreview('', setModalState);
                             },
-                            child: const Text('Bersihkan', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                            child: Text(t('clear'), style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
                           ),
                       ],
                     ),
@@ -655,19 +804,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onPressed: isValid
                       ? () async {
                           Navigator.pop(dialogCtx);
-                          final count = await widget.storageService.importTransactions(
-                            previewItems,
-                            skipDuplicates: skipDuplicates,
-                          );
-                          if (mounted) {
-                            setState(() {});
-                            widget.onDataChanged();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Berhasil mengimpor $count transaksi baru!'),
-                                backgroundColor: AppTheme.emeraldGreen,
-                              ),
+                          if (isSavings && previewSavings != null) {
+                            final count = await widget.storageService.importSavingsData(
+                              newPockets: previewSavings!.pockets,
+                              newRecords: previewSavings!.records,
+                              skipDuplicates: skipDuplicates,
                             );
+                            if (mounted) {
+                              setState(() {});
+                              widget.onDataChanged();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(t('importPocketSuccess').replaceAll('{pockets}', '${previewSavings!.pockets.length}').replaceAll('{count}', '$count')),
+                                  backgroundColor: AppTheme.emeraldGreen,
+                                ),
+                              );
+                            }
+                          } else {
+                            final count = await widget.storageService.importTransactions(
+                              previewItems,
+                              skipDuplicates: skipDuplicates,
+                            );
+                            if (mounted) {
+                              setState(() {});
+                              widget.onDataChanged();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(t('importTxSuccess').replaceAll('{count}', '$count')),
+                                  backgroundColor: AppTheme.emeraldGreen,
+                                ),
+                              );
+                            }
                           }
                         }
                       : null,

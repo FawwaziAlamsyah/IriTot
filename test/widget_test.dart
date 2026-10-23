@@ -48,7 +48,7 @@ void main() {
     expect(find.text('IRITOT'), findsOneWidget);
     expect(find.text('PERSONAL'), findsOneWidget);
     expect(find.text('Spending'), findsOneWidget);
-    expect(find.text('Budget'), findsOneWidget);
+    expect(find.text('Monthly Budget'), findsOneWidget);
     expect(find.text('TOTAL CASH BALANCE'), findsOneWidget);
     expect(find.text('Monthly'), findsOneWidget);
     expect(find.text('SAVINGS & POCKETS'), findsNothing);

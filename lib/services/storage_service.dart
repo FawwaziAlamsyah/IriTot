@@ -542,6 +542,50 @@ class StorageService {
     await _prefs.setString(_keySavingsRecords, raw);
   }
 
+  // Import Kantong Tabungan dan Riwayat Mutasi dari CSV
+  Future<int> importSavingsData({
+    required List<SavingsPocket> newPockets,
+    required List<SavingsRecord> newRecords,
+    bool skipDuplicates = true,
+  }) async {
+    final existingPockets = getSavingsPockets();
+    final existingRecords = getSavingsRecords();
+
+    final pocketMap = {for (var p in existingPockets) p.name.trim().toLowerCase(): p};
+
+    for (final np in newPockets) {
+      final key = np.name.trim().toLowerCase();
+      if (!pocketMap.containsKey(key)) {
+        existingPockets.add(np);
+        pocketMap[key] = np;
+      } else {
+        // Perbarui saldo terkini
+        final existing = pocketMap[key]!;
+        existing.currentAmount = np.currentAmount;
+      }
+    }
+
+    final existingRecordIds = {for (var r in existingRecords) r.id};
+    final existingSignatures = {
+      for (var r in existingRecords)
+        '${r.pocketName}_${r.date.toIso8601String()}_${r.amount}_${r.type}'
+    };
+
+    int addedCount = 0;
+    for (final nr in newRecords) {
+      final sig = '${nr.pocketName}_${nr.date.toIso8601String()}_${nr.amount}_${nr.type}';
+      if (skipDuplicates && (existingRecordIds.contains(nr.id) || existingSignatures.contains(sig))) {
+        continue;
+      }
+      existingRecords.add(nr);
+      addedCount++;
+    }
+
+    await saveSavingsPockets(existingPockets);
+    await saveSavingsRecords(existingRecords);
+    return addedCount;
+  }
+
   // Setor Tabungan (Masuk / Deposit)
   Future<void> depositToSavings({
     required String pocketId,

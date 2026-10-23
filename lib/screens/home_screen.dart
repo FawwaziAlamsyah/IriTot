@@ -3,7 +3,6 @@ import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/transaction_item.dart';
 import '../models/category.dart';
-import '../models/budget.dart';
 import '../models/wallet.dart';
 import '../services/storage_service.dart';
 import '../services/ai_service.dart';
@@ -320,7 +319,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final wallets = widget.storageService.getWallets();
     final transactions = widget.storageService.getTransactions();
     final categories = widget.storageService.getCategories();
-    final budgets = widget.storageService.getBudgets(now.month, now.year);
 
     final catMap = {for (var c in categories) c.id: c};
     final walletMap = {for (var w in wallets) w.id: w};
@@ -505,7 +503,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   dividerHeight: 1.0,
                   tabs: [
                     Tab(text: widget.localeService?.t('tabDailySpending') ?? 'Spending'),
-                    Tab(text: widget.localeService?.t('tabBudget') ?? 'Budget'),
+                    Tab(text: widget.localeService?.t('tabBudget') ?? 'Monthly Budget'),
                   ],
                 ),
               ),
@@ -525,7 +523,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     wallets: wallets,
                     transactions: transactions,
                     categories: categories,
-                    budgets: budgets,
                     catMap: catMap,
                     walletMap: walletMap,
                   ),
@@ -556,7 +553,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     required List<Wallet> wallets,
     required List<TransactionItem> transactions,
     required List<CategoryItem> categories,
-    required List<Budget> budgets,
     required Map<String, CategoryItem> catMap,
     required Map<String, Wallet> walletMap,
   }) {
@@ -822,32 +818,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
           const SizedBox(height: 22),
 
-          // Pantauan Anggaran
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                widget.localeService?.t('secBudget') ?? 'MONTHLY BUDGET PROGRESS',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5,
-                  color: AppTheme.textSecondary,
-                ),
-              ),
-              TextButton(
-                onPressed: () {
-                  _tabController.animateTo(1);
-                },
-                style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
-                child: Text(widget.localeService?.t('seeAll') ?? 'See All', style: const TextStyle(fontSize: 12, color: AppTheme.cyanAccent)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          _buildBudgetCard(budgets, transactions, catMap, now),
-          const SizedBox(height: 22),
-
           // Transaksi Terbaru
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1071,91 +1041,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildBudgetCard(
-    List<Budget> budgets,
-    List<TransactionItem> transactions,
-    Map<String, CategoryItem> catMap,
-    DateTime now,
-  ) {
-    if (budgets.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppTheme.surfaceDark,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppTheme.borderDark),
-        ),
-        child: Text(
-          widget.localeService?.t('noBudgetSet') ?? 'No monthly budgets set yet. Tap Budget tab to set spending limits.',
-          style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
-        ),
-      );
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceDark,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppTheme.borderDark),
-      ),
-      child: Column(
-        children: budgets.take(2).map((b) {
-          final cat = catMap[b.categoryId];
-          final spent = transactions
-              .where((t) =>
-                  t.categoryId == b.categoryId &&
-                  t.type == 'expense' &&
-                  t.date.month == now.month &&
-                  t.date.year == now.year)
-              .fold(0.0, (sum, t) => sum + t.amount);
-
-          final ratio = (spent / b.monthlyLimit).clamp(0.0, 1.0);
-          final percent = ((spent / b.monthlyLimit) * 100).toInt();
-          final isWarning = percent >= 80;
-
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      cat?.name ?? 'Kategori',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
-                    ),
-                    Text(
-                      '$percent%',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: isWarning ? AppTheme.coralRose : AppTheme.emeraldGreen,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: ratio,
-                    backgroundColor: AppTheme.surfaceLighter,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      isWarning ? AppTheme.coralRose : AppTheme.emeraldGreen,
-                    ),
-                    minHeight: 6,
-                  ),
-                ),
-              ],
-            ),
-          );
-        }).toList(),
       ),
     );
   }

@@ -107,6 +107,7 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
+            physics: const ClampingScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -246,41 +247,48 @@ class _LoginScreenState extends State<LoginScreen> {
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppTheme.borderDark)),
                           enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppTheme.borderDark)),
                           focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppTheme.emeraldGreen, width: 1.5)),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                         ),
                         onSubmitted: (_) => _handleLogin(),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 18),
 
                       // Ingat Saya (Menyimpan username saja, password wajib ketik manual)
-                      Row(
-                        children: [
-                          SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: Checkbox(
-                              value: _rememberMe,
-                              activeColor: AppTheme.emeraldGreen,
-                              checkColor: Colors.black,
-                              side: const BorderSide(color: AppTheme.borderDark),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                              onChanged: (val) {
-                                final isChecked = val ?? true;
-                                setState(() => _rememberMe = isChecked);
-                                widget.authService.setRememberMe(isChecked);
-                              },
-                            ),
+                      InkWell(
+                        onTap: () {
+                          final isChecked = !_rememberMe;
+                          setState(() => _rememberMe = isChecked);
+                          widget.authService.setRememberMe(isChecked);
+                        },
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: Checkbox(
+                                  value: _rememberMe,
+                                  activeColor: AppTheme.emeraldGreen,
+                                  checkColor: Colors.black,
+                                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  visualDensity: VisualDensity.compact,
+                                  side: const BorderSide(color: AppTheme.borderDark),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                                  onChanged: (val) {
+                                    final isChecked = val ?? true;
+                                    setState(() => _rememberMe = isChecked);
+                                    widget.authService.setRememberMe(isChecked);
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Text(t('rememberMe'), style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                            ],
                           ),
-                          const SizedBox(width: 8),
-                          GestureDetector(
-                            onTap: () {
-                              final isChecked = !_rememberMe;
-                              setState(() => _rememberMe = isChecked);
-                              widget.authService.setRememberMe(isChecked);
-                            },
-                            child: Text(t('rememberMe'), style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
-                          ),
-                        ],
+                        ),
                       ),
                       const SizedBox(height: 24),
 

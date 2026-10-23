@@ -266,4 +266,55 @@ void main() {
     expect(receiptRes.containsKey('merchant'), isTrue);
     expect(receiptRes.containsKey('amount'), isTrue);
   });
+
+  test('CsvService and StorageService savings/pocket CSV cycle', () async {
+    final storage = await StorageService.init();
+
+    const sampleCsv = '''ID,Tanggal,Kantong,Tipe,Nominal,Catatan,Saldo_Akhir
+rec_1,2026-01-01 12:00:00,SuperBank,in,10000000,Setoran awal,10000000
+rec_2,2026-02-01 12:00:00,SuperBank,in,5000000,Gajian,15000000
+rec_3,2026-03-01 12:00:00,Krom,in,20000000,THR,20000000
+''';
+
+    expect(CsvService.isSavingsCsv(sampleCsv), isTrue);
+
+    final parsed = CsvService.parseCsvToSavings(sampleCsv);
+    expect(parsed.pockets.length, 2);
+    expect(parsed.records.length, 3);
+
+    final superbank = parsed.pockets.firstWhere((p) => p.name == 'SuperBank');
+    expect(superbank.currentAmount, 15000000);
+
+    final krom = parsed.pockets.firstWhere((p) => p.name == 'Krom');
+    expect(krom.currentAmount, 20000000);
+
+    // Import into StorageService
+    final imported = await storage.importSavingsData(
+      newPockets: parsed.pockets,
+      newRecords: parsed.records,
+      skipDuplicates: true,
+    );
+    expect(imported, 3);
+    expect(storage.getSavingsPockets().length, 2);
+    expect(storage.getSavingsRecords().length, 3);
+    expect(storage.getTotalSavingsBalance(), 35000000);
+
+    // Re-import with skipDuplicates
+    final reimported = await storage.importSavingsData(
+      newPockets: parsed.pockets,
+      newRecords: parsed.records,
+      skipDuplicates: true,
+    );
+    expect(reimported, 0);
+    expect(storage.getSavingsRecords().length, 3);
+
+    // Export back to CSV
+    final exported = CsvService.exportSavingsToCsv(
+      pockets: storage.getSavingsPockets(),
+      records: storage.getSavingsRecords(),
+    );
+    expect(exported.contains('SuperBank'), isTrue);
+    expect(exported.contains('Krom'), isTrue);
+    expect(exported.contains('15000000'), isTrue);
+  });
 }
