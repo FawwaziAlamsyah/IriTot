@@ -1339,8 +1339,20 @@ class _SavingsScreenState extends State<SavingsScreen> {
                     child: ElevatedButton.icon(
                       onPressed: () async {
                         try {
+                          setModalState(() => validationMsg = t('readingFile'));
                           final text = await FileIoService.pickCsvText();
-                          if (text == null) return;
+                          if (text == null) {
+                            setModalState(() {
+                              if (csvCtrl.text.isEmpty) {
+                                validationMsg = null;
+                              }
+                            });
+                            return;
+                          }
+                          if (text.trim().isEmpty) {
+                            setModalState(() => validationMsg = t('fileEmpty'));
+                            return;
+                          }
                           csvCtrl.text = text;
                           updatePreview(text, setModalState);
                         } catch (e) {
