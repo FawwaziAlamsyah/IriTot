@@ -65,6 +65,20 @@ class _BudgetScreenState extends State<BudgetScreen> {
             ],
           ),
           actions: [
+            if (currentLimit > 0)
+              TextButton(
+                onPressed: () async {
+                  final navigator = Navigator.of(dialogContext);
+                  final now = DateTime.now();
+                  await widget.storageService.deleteBudget(category.id, now.month, now.year);
+                  if (mounted) {
+                    setState(() {});
+                    widget.onDataChanged();
+                  }
+                  navigator.pop();
+                },
+                child: const Text('Hapus Anggaran', style: TextStyle(color: AppTheme.coralRose, fontWeight: FontWeight.w600)),
+              ),
             TextButton(
               onPressed: () => Navigator.pop(dialogContext),
               child: const Text('Batal', style: TextStyle(color: AppTheme.textMuted)),
@@ -74,7 +88,11 @@ class _BudgetScreenState extends State<BudgetScreen> {
                 final navigator = Navigator.of(dialogContext);
                 final limit = double.tryParse(controller.text.replaceAll('.', '')) ?? 0.0;
                 final now = DateTime.now();
-                await widget.storageService.setBudget(category.id, limit, now.month, now.year);
+                if (limit <= 0) {
+                  await widget.storageService.deleteBudget(category.id, now.month, now.year);
+                } else {
+                  await widget.storageService.setBudget(category.id, limit, now.month, now.year);
+                }
                 if (mounted) {
                   setState(() {});
                   widget.onDataChanged();

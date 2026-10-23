@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
 import '../models/wallet.dart';
+import '../models/category.dart';
 import '../services/storage_service.dart';
 import '../services/csv_service.dart';
 import '../services/ai_service.dart';
@@ -178,6 +179,231 @@ class _SettingsScreenState extends State<SettingsScreen> {
             style: TextStyle(fontSize: 11, fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500, color: isSelected ? AppTheme.emeraldGreen : AppTheme.textSecondary),
           ),
         ),
+      ),
+    );
+  }
+
+  void _showDeleteWalletConfirmDialog(Wallet w) {
+    final t = widget.localeService.t;
+    final wallets = widget.storageService.getWallets();
+    if (wallets.length <= 1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(t('cannotDeleteLastWallet')),
+          backgroundColor: AppTheme.coralRose,
+        ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          backgroundColor: AppTheme.surfaceDark,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: const BorderSide(color: AppTheme.borderDark),
+          ),
+          title: Row(
+            children: [
+              const Icon(Icons.delete_outline, color: AppTheme.coralRose, size: 22),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text('${t('deleteWallet')} "${w.name}"', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+              ),
+            ],
+          ),
+          content: Text(
+            t('deleteWalletConfirm'),
+            style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: Text(t('cancel'), style: const TextStyle(color: AppTheme.textMuted)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(dialogCtx);
+                await widget.storageService.deleteWallet(w.id);
+                if (mounted) {
+                  setState(() {});
+                  widget.onDataChanged();
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.coralRose,
+                foregroundColor: Colors.white,
+              ),
+              child: Text(t('delete'), style: const TextStyle(fontWeight: FontWeight.w700)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showAddCategoryDialog() {
+    final t = widget.localeService.t;
+    final nameCtrl = TextEditingController();
+    String type = 'expense';
+    int colorValue = 0xFFF59E0B;
+
+    final colorOptions = [
+      0xFFF59E0B, // Amber
+      0xFF38BDF8, // Cyan/Sky
+      0xFFF43F5E, // Rose
+      0xFF8B5CF6, // Purple
+      0xFFEC4899, // Pink
+      0xFF10B981, // Emerald
+      0xFF14B8A6, // Teal
+      0xFF64748B, // Slate
+    ];
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (builderCtx, setModalState) {
+            return AlertDialog(
+              backgroundColor: AppTheme.surfaceDark,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: const BorderSide(color: AppTheme.borderDark),
+              ),
+              title: Text(t('addCategoryTitle'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(t('categoryName'), style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: nameCtrl,
+                    style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14),
+                    decoration: InputDecoration(
+                      hintText: t('categoryNameHint'),
+                      hintStyle: TextStyle(color: AppTheme.textMuted.withValues(alpha: 0.6), fontSize: 12),
+                      filled: true,
+                      fillColor: AppTheme.surfaceLighter,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.borderDark)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(t('categoryType'), style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      _buildTypeRadio('expense', t('expense'), type, (v) => setModalState(() => type = v)),
+                      _buildTypeRadio('income', t('income'), type, (v) => setModalState(() => type = v)),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  const Text('Pilih Warna:', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: colorOptions.map((c) {
+                      final isSelected = colorValue == c;
+                      return GestureDetector(
+                        onTap: () => setModalState(() => colorValue = c),
+                        child: Container(
+                          width: 26,
+                          height: 26,
+                          decoration: BoxDecoration(
+                            color: Color(c),
+                            shape: BoxShape.circle,
+                            border: isSelected ? Border.all(color: Colors.white, width: 2.5) : null,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogCtx),
+                  child: Text(t('cancel'), style: const TextStyle(color: AppTheme.textMuted)),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (nameCtrl.text.trim().isEmpty) return;
+                    final navigator = Navigator.of(dialogCtx);
+                    final newCat = CategoryItem(
+                      id: 'cat_${const Uuid().v4().substring(0, 8)}',
+                      name: nameCtrl.text.trim(),
+                      type: type,
+                      icon: type == 'income' ? 'trending_up' : 'label',
+                      colorValue: colorValue,
+                    );
+                    await widget.storageService.addCategory(newCat);
+                    if (mounted) {
+                      setState(() {});
+                      widget.onDataChanged();
+                    }
+                    navigator.pop();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.emeraldGreen,
+                    foregroundColor: Colors.black,
+                  ),
+                  child: Text(t('add'), style: const TextStyle(fontWeight: FontWeight.w700)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showDeleteCategoryConfirmDialog(CategoryItem c) {
+    final t = widget.localeService.t;
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: AppTheme.surfaceDark,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: AppTheme.borderDark),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.delete_outline, color: AppTheme.coralRose, size: 22),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text('${t('deleteCategory')} "${c.name}"', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+            ),
+          ],
+        ),
+        content: Text(
+          t('deleteCategoryConfirm'),
+          style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: Text(t('cancel'), style: const TextStyle(color: AppTheme.textMuted)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(dialogCtx);
+              await widget.storageService.deleteCategory(c.id);
+              if (mounted) {
+                setState(() {});
+                widget.onDataChanged();
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.coralRose,
+              foregroundColor: Colors.white,
+            ),
+            child: Text(t('delete'), style: const TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
       ),
     );
   }
@@ -552,10 +778,71 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  void _showResetDataConfirmDialog() {
+    final t = widget.localeService.t;
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          backgroundColor: AppTheme.surfaceDark,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: const BorderSide(color: AppTheme.borderDark),
+          ),
+          title: Row(
+            children: [
+              const Icon(Icons.warning_amber_rounded, color: AppTheme.coralRose, size: 22),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  t('resetDataDialogTitle'),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            t('resetDataDialogDesc'),
+            style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary, height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: Text(t('cancel'), style: const TextStyle(color: AppTheme.textMuted)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(dialogCtx);
+                await widget.storageService.clearFinancialData();
+                widget.onDataChanged();
+                if (mounted) {
+                  setState(() {});
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(t('resetDataSuccess')),
+                      backgroundColor: AppTheme.emeraldGreen,
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.coralRose,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: Text(t('resetDataConfirm'), style: const TextStyle(fontWeight: FontWeight.w700)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = widget.localeService.t;
     final wallets = widget.storageService.getWallets();
+    final categories = widget.storageService.getCategories();
 
     return Scaffold(
       backgroundColor: AppTheme.bgDark,
@@ -797,9 +1084,104 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             Text(w.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
                           ],
                         ),
-                        Text(
-                          'Rp ${w.balance.toStringAsFixed(0)}',
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+                        Row(
+                          children: [
+                            Text(
+                              'Rp ${w.balance.toStringAsFixed(0)}',
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+                            ),
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: () => _showDeleteWalletConfirmDialog(w),
+                              child: const Padding(
+                                padding: EdgeInsets.all(4),
+                                child: Icon(Icons.delete_outline, size: 18, color: AppTheme.coralRose),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 24),
+
+              // Seksi Kelola Kategori
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(t('secCategories'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.5, color: AppTheme.textSecondary)),
+                  TextButton.icon(
+                    onPressed: _showAddCategoryDialog,
+                    icon: const Icon(Icons.add, size: 16, color: AppTheme.emeraldGreen),
+                    label: Text(t('add'), style: const TextStyle(fontSize: 12, color: AppTheme.emeraldGreen)),
+                    style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: categories.length,
+                separatorBuilder: (context, index) => const SizedBox(height: 8),
+                itemBuilder: (context, index) {
+                  final c = categories[index];
+                  final isExp = c.type == 'expense';
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surfaceDark,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppTheme.borderDark),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                color: Color(c.colorValue),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              c.name,
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: isExp
+                                    ? AppTheme.coralRose.withValues(alpha: 0.12)
+                                    : (c.type == 'income'
+                                        ? AppTheme.emeraldGreen.withValues(alpha: 0.12)
+                                        : AppTheme.cyanAccent.withValues(alpha: 0.12)),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                isExp ? t('expense') : (c.type == 'income' ? t('income') : 'Transfer'),
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  color: isExp ? AppTheme.coralRose : (c.type == 'income' ? AppTheme.emeraldGreen : AppTheme.cyanAccent),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        GestureDetector(
+                          onTap: () => _showDeleteCategoryConfirmDialog(c),
+                          child: const Padding(
+                            padding: EdgeInsets.all(4),
+                            child: Icon(Icons.delete_outline, size: 18, color: AppTheme.coralRose),
+                          ),
                         ),
                       ],
                     ),
@@ -814,16 +1196,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Material(
                 color: AppTheme.surfaceDark,
                 borderRadius: BorderRadius.circular(16),
-                child: ListTile(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    side: const BorderSide(color: AppTheme.borderDark),
-                  ),
-                  leading: const Icon(Icons.file_download, color: AppTheme.cyanAccent),
-                  title: Text(t('exportCsvTitle'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
-                  subtitle: Text(t('exportCsvSubtitle'), style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
-                  trailing: const Icon(Icons.chevron_right, size: 18, color: AppTheme.textMuted),
-                  onTap: _exportCsv,
+                child: Column(
+                  children: [
+                    ListTile(
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                      ),
+                      leading: const Icon(Icons.file_download, color: AppTheme.cyanAccent),
+                      title: Text(t('exportCsvTitle'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
+                      subtitle: Text(t('exportCsvSubtitle'), style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                      trailing: const Icon(Icons.chevron_right, size: 18, color: AppTheme.textMuted),
+                      onTap: _exportCsv,
+                    ),
+                    const Divider(color: AppTheme.borderDark, height: 1),
+                    ListTile(
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
+                      ),
+                      leading: const Icon(Icons.delete_sweep_outlined, color: AppTheme.coralRose),
+                      title: Text(t('resetDataTitle'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.coralRose)),
+                      subtitle: Text(t('resetDataSubtitle'), style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                      trailing: const Icon(Icons.chevron_right, size: 18, color: AppTheme.textMuted),
+                      onTap: _showResetDataConfirmDialog,
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 24),

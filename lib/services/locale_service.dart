@@ -61,7 +61,7 @@ class LocaleService extends ChangeNotifier {
 
       // Navigation Bar
       'navHome': 'Home',
-      'navSavings': 'Savings',
+      'navSavings': 'Pocket',
       'navLog': 'Log',
       'navReports': 'Reports',
       'navSettings': 'Settings',
@@ -72,8 +72,8 @@ class LocaleService extends ChangeNotifier {
       'splashDecryption': 'Securing offline local vault...',
 
       // Main Screen Tabs (Blu Style)
-      'tabDailySpending': 'Daily Spending',
-      'tabSavings': 'Savings',
+      'tabDailySpending': 'Savings',
+      'tabSavings': 'Pocket',
 
       // Login Screen
       'loginTitle': 'Sign In to Your Account',
@@ -142,6 +142,12 @@ class LocaleService extends ChangeNotifier {
       'exportModalTitle': 'CSV Universal Backup',
       'copyCsv': 'Copy CSV',
       'csvCopied': 'CSV file copied to clipboard!',
+      'resetDataTitle': 'Reset Financial Data',
+      'resetDataSubtitle': 'Wipe dummy transactions and start fresh',
+      'resetDataDialogTitle': 'Reset All Data?',
+      'resetDataDialogDesc': 'This will remove all transactions, budgets, and savings pockets, setting your wallet balance to Rp 0. Your login credentials will remain intact.',
+      'resetDataConfirm': 'Reset Clean Now',
+      'resetDataSuccess': 'All financial data has been wiped clean!',
 
       // AI Settings
       'secAi': 'AI ASSISTANT (PERSONAL BYOK)',
@@ -153,6 +159,24 @@ class LocaleService extends ChangeNotifier {
       'aiEndpoint': 'Ollama Endpoint URL:',
       'saveAiBtn': 'Save AI Settings',
       'aiSavedSuccess': 'API settings saved to local device secure storage.',
+
+      // Periods & Deletions
+      'periodDaily': 'Daily',
+      'periodWeekly': 'Weekly',
+      'periodMonthly': 'Monthly',
+      'periodDailyTitle': 'TODAY SPENDING',
+      'periodWeeklyTitle': 'THIS WEEK SPENDING',
+      'periodMonthlyTitle': 'THIS MONTH SPENDING',
+      'noTransactionsPeriod': 'No transactions in this period',
+      'deleteTransactionConfirm': 'Delete this transaction? Wallet balance will be restored.',
+      'deletePocketConfirm': 'Delete this savings pocket? Any remaining funds will be returned to your wallet.',
+      'deleteWalletConfirm': 'Delete this wallet? Transaction history will be retained.',
+      'deleteCategoryConfirm': 'Delete this category?',
+      'cannotDeleteLastWallet': 'You must keep at least one active wallet.',
+      'manageCategoriesTitle': 'Manage Categories',
+      'addCategoryTitle': 'Add Custom Category',
+      'categoryNameHint': 'e.g. Gym & Fitness',
+      'deleteBudgetConfirm': 'Remove budget for this category?',
 
       // Home Screen
       'totalCashBalance': 'TOTAL CASH BALANCE',
@@ -174,7 +198,7 @@ class LocaleService extends ChangeNotifier {
       'yesterday': 'Yesterday',
 
       // Savings Screen
-      'savingsScreenTitle': 'Savings & Pockets',
+      'savingsScreenTitle': 'Pocket',
       'totalSavings': 'TOTAL SAVINGS',
       'target': 'Target',
       'deposit': 'Deposit',
@@ -218,7 +242,7 @@ class LocaleService extends ChangeNotifier {
 
       // Navigation Bar
       'navHome': 'Beranda',
-      'navSavings': 'Tabungan',
+      'navSavings': 'Pocket',
       'navLog': 'Catat',
       'navReports': 'Laporan',
       'navSettings': 'Setelan',
@@ -229,8 +253,8 @@ class LocaleService extends ChangeNotifier {
       'splashDecryption': 'Mengamankan brankas lokal...',
 
       // Main Screen Tabs (Blu Style)
-      'tabDailySpending': 'Pemakaian Sehari-hari',
-      'tabSavings': 'Tabungan',
+      'tabDailySpending': 'Savings',
+      'tabSavings': 'Pocket',
 
       // Login Screen
       'loginTitle': 'Masuk ke Akun Anda',
@@ -299,6 +323,12 @@ class LocaleService extends ChangeNotifier {
       'exportModalTitle': 'Ekspor Cadangan CSV',
       'copyCsv': 'Salin CSV',
       'csvCopied': 'File CSV disalin ke Clipboard!',
+      'resetDataTitle': 'Bersihkan Data Finansial',
+      'resetDataSubtitle': 'Hapus riwayat dummy & mulai dari nol',
+      'resetDataDialogTitle': 'Bersihkan Semua Data?',
+      'resetDataDialogDesc': 'Tindakan ini akan menghapus semua riwayat transaksi, anggaran, dan tabungan, serta mengembalikan saldo dompet ke Rp 0. Akun login Anda tetap aman.',
+      'resetDataConfirm': 'Bersihkan Sekarang',
+      'resetDataSuccess': 'Semua data finansial berhasil dibersihkan!',
 
       // AI Settings
       'secAi': 'ASSISTANT AI (BYOK PRIBADI)',
@@ -310,6 +340,24 @@ class LocaleService extends ChangeNotifier {
       'aiEndpoint': 'Endpoint URL Ollama:',
       'saveAiBtn': 'Simpan Pengaturan AI',
       'aiSavedSuccess': 'Pengaturan Kunci API tersimpan di penyimpanan aman lokal HP.',
+
+      // Periods & Deletions
+      'periodDaily': 'Harian',
+      'periodWeekly': 'Mingguan',
+      'periodMonthly': 'Bulanan',
+      'periodDailyTitle': 'PENGELUARAN HARI INI',
+      'periodWeeklyTitle': 'PENGELUARAN MINGGU INI',
+      'periodMonthlyTitle': 'PENGELUARAN BULAN INI',
+      'noTransactionsPeriod': 'Belum ada transaksi pada periode ini',
+      'deleteTransactionConfirm': 'Hapus transaksi ini? Saldo dompet akan disesuaikan kembali.',
+      'deletePocketConfirm': 'Hapus pos celengan ini? Sisa saldo akan dikembalikan ke dompet utama.',
+      'deleteWalletConfirm': 'Hapus dompet ini? Riwayat transaksi tetap disimpan.',
+      'deleteCategoryConfirm': 'Hapus kategori ini?',
+      'cannotDeleteLastWallet': 'Minimal harus ada 1 dompet aktif.',
+      'manageCategoriesTitle': 'Kelola Kategori',
+      'addCategoryTitle': 'Tambah Kategori Baru',
+      'categoryNameHint': 'Contoh: Gym & Olahraga',
+      'deleteBudgetConfirm': 'Hapus anggaran untuk kategori ini?',
 
       // Home Screen
       'totalCashBalance': 'TOTAL SALDO KAS',
@@ -331,7 +379,7 @@ class LocaleService extends ChangeNotifier {
       'yesterday': 'Kemarin',
 
       // Savings Screen
-      'savingsScreenTitle': 'Tabungan & Celengan',
+      'savingsScreenTitle': 'Pocket',
       'totalSavings': 'TOTAL TABUNGAN SAYA',
       'target': 'Target',
       'deposit': 'Nabung Masuk',

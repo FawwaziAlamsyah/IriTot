@@ -223,34 +223,36 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         border: Border.all(color: AppTheme.borderDark),
                       ),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 10,
-                                height: 10,
-                                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-                              ),
-                              const SizedBox(width: 10),
-                              Text(
-                                cat?.name ?? 'Umum',
-                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
-                              ),
-                            ],
+                          Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
                           ),
-                          Row(
-                            children: [
-                              Text(
-                                '$percent%',
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.textMuted),
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              cat?.name ?? 'Umum',
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '$percent%',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.textMuted),
+                          ),
+                          const SizedBox(width: 12),
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 120),
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerRight,
+                              child: Text(
                                 _currencyFormat.format(item.value),
                                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.coralRose),
                               ),
-                            ],
+                            ),
                           ),
                         ],
                       ),

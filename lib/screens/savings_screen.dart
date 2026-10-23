@@ -38,6 +38,58 @@ class _SavingsScreenState extends State<SavingsScreen> {
     decimalDigits: 0,
   );
 
+  void _confirmDeletePocket(SavingsPocket p) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: AppTheme.surfaceDark,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: AppTheme.borderDark),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.delete_outline, color: AppTheme.coralRose, size: 22),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Hapus Pos "${p.name}"',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          p.currentAmount > 0
+              ? 'Pos celengan ini masih memiliki saldo ${_currencyFormat.format(p.currentAmount)}. Sisa saldo ini akan otomatis dikembalikan ke dompet kas.'
+              : 'Apakah Anda yakin ingin menghapus pos celengan ini?',
+          style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Batal', style: TextStyle(color: AppTheme.textMuted)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(dialogCtx);
+              await widget.storageService.deleteSavingsPocketWithRefund(p.id);
+              if (mounted) {
+                setState(() {});
+                widget.onDataChanged();
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.coralRose,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Hapus Pos', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
+
   // Modal Setor / Nabung Masuk
   void _showDepositModal({SavingsPocket? preselectedPocket}) {
     final pockets = widget.storageService.getSavingsPockets();
@@ -1030,32 +1082,43 @@ class _SavingsScreenState extends State<SavingsScreen> {
 
                           // Tombol Aksi Cepat per Kantong
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              OutlinedButton.icon(
-                                onPressed: () => _showWithdrawModal(preselectedPocket: p),
-                                icon: const Icon(Icons.remove, size: 14),
-                                label: const Text('Tarik', style: TextStyle(fontSize: 11)),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: AppTheme.coralRose,
-                                  side: const BorderSide(color: AppTheme.borderDark),
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                  minimumSize: Size.zero,
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                ),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline, size: 18, color: AppTheme.coralRose),
+                                tooltip: 'Hapus Pos Tabungan',
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                onPressed: () => _confirmDeletePocket(p),
                               ),
-                              const SizedBox(width: 8),
-                              ElevatedButton.icon(
-                                onPressed: () => _showDepositModal(preselectedPocket: p),
-                                icon: const Icon(Icons.add, size: 14),
-                                label: const Text('Nabung', style: TextStyle(fontSize: 11)),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: color,
-                                  foregroundColor: Colors.black,
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                  minimumSize: Size.zero,
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                ),
+                              Row(
+                                children: [
+                                  OutlinedButton.icon(
+                                    onPressed: () => _showWithdrawModal(preselectedPocket: p),
+                                    icon: const Icon(Icons.remove, size: 14),
+                                    label: const Text('Tarik', style: TextStyle(fontSize: 11)),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: AppTheme.coralRose,
+                                      side: const BorderSide(color: AppTheme.borderDark),
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      minimumSize: Size.zero,
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  ElevatedButton.icon(
+                                    onPressed: () => _showDepositModal(preselectedPocket: p),
+                                    icon: const Icon(Icons.add, size: 14),
+                                    label: const Text('Nabung', style: TextStyle(fontSize: 11)),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: color,
+                                      foregroundColor: Colors.black,
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      minimumSize: Size.zero,
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),

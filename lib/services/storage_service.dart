@@ -33,31 +33,15 @@ class StorageService {
   Future<void> _seedInitialDataIfNeeded() async {
     final isInit = _prefs.getBool(_keyIsInit) ?? false;
     if (!isInit) {
-      // Default Wallets
+      // Clean starter wallet with zero balance
       final defaultWallets = [
         Wallet(
           id: 'w_cash',
-          name: 'Dompet Tunai',
+          name: 'Dompet Utama',
           type: 'cash',
-          balance: 450000.0,
-          icon: 'payments',
+          balance: 0.0,
+          icon: 'account_balance_wallet',
           colorValue: 0xFF10B981,
-        ),
-        Wallet(
-          id: 'w_bca',
-          name: 'Bank BCA',
-          type: 'bank',
-          balance: 12400000.0,
-          icon: 'account_balance',
-          colorValue: 0xFF38BDF8,
-        ),
-        Wallet(
-          id: 'w_gopay',
-          name: 'GoPay / E-Wallet',
-          type: 'ewallet',
-          balance: 2000000.0,
-          icon: 'phone_android',
-          colorValue: 0xFF8B5CF6,
         ),
       ];
 
@@ -128,81 +112,8 @@ class StorageService {
         ),
       ];
 
-      final now = DateTime.now();
-
-      // Default Budgets for current month
-      final defaultBudgets = [
-        Budget(
-          id: 'b_food',
-          categoryId: 'cat_food',
-          monthlyLimit: 2500000.0,
-          month: now.month,
-          year: now.year,
-        ),
-        Budget(
-          id: 'b_transport',
-          categoryId: 'cat_transport',
-          monthlyLimit: 1000000.0,
-          month: now.month,
-          year: now.year,
-        ),
-        Budget(
-          id: 'b_shopping',
-          categoryId: 'cat_shopping',
-          monthlyLimit: 1500000.0,
-          month: now.month,
-          year: now.year,
-        ),
-      ];
-
-      // Default Seed Transactions
-      final defaultTransactions = [
-        TransactionItem(
-          id: _uuid.v4(),
-          walletId: 'w_bca',
-          categoryId: 'cat_salary',
-          type: 'income',
-          amount: 6500000.0,
-          note: 'Gaji Pokok Awal Bulan',
-          date: DateTime(now.year, now.month, 1, 9, 0),
-        ),
-        TransactionItem(
-          id: _uuid.v4(),
-          walletId: 'w_cash',
-          categoryId: 'cat_food',
-          type: 'expense',
-          amount: 25000.0,
-          note: 'Makan Siang Nasi Padang',
-          date: DateTime(now.year, now.month, now.day, 12, 30),
-        ),
-        TransactionItem(
-          id: _uuid.v4(),
-          walletId: 'w_gopay',
-          categoryId: 'cat_food',
-          type: 'expense',
-          amount: 18000.0,
-          note: 'Es Kopi Susu Aren',
-          date: DateTime(now.year, now.month, now.day, 9, 15),
-        ),
-        TransactionItem(
-          id: _uuid.v4(),
-          walletId: 'w_bca',
-          categoryId: 'cat_transport',
-          type: 'expense',
-          amount: 35000.0,
-          note: 'Isi Bensin Pertamax',
-          date: DateTime(now.year, now.month, now.day - 1, 17, 20),
-        ),
-        TransactionItem(
-          id: _uuid.v4(),
-          walletId: 'w_bca',
-          categoryId: 'cat_shopping',
-          type: 'expense',
-          amount: 114500.0,
-          note: 'Belanja Mingguan Superindo',
-          date: DateTime(now.year, now.month, now.day - 2, 19, 45),
-        ),
-      ];
+      final List<Budget> defaultBudgets = [];
+      final List<TransactionItem> defaultTransactions = [];
 
       await saveWallets(defaultWallets);
       await saveCategories(defaultCategories);
@@ -215,94 +126,24 @@ class StorageService {
   Future<void> _seedSavingsIfNeeded() async {
     final rawPockets = _prefs.getString(_keySavingsPockets);
     if (rawPockets == null) {
-      final now = DateTime.now();
-
-      final defaultPockets = [
-        SavingsPocket(
-          id: 'sp_emergency',
-          name: 'Dana Darurat',
-          targetAmount: 15000000.0,
-          currentAmount: 6500000.0,
-          colorValue: 0xFF10B981,
-          icon: 'security',
-          targetDate: DateTime(now.year + 1, 12, 31),
-          notes: 'Target 6 bulan biaya hidup darurat',
-          createdAt: DateTime(now.year, now.month - 2, 1),
-        ),
-        SavingsPocket(
-          id: 'sp_laptop',
-          name: 'Beli Gadget / Laptop',
-          targetAmount: 12000000.0,
-          currentAmount: 4000000.0,
-          colorValue: 0xFF38BDF8,
-          icon: 'devices',
-          targetDate: DateTime(now.year, now.month + 3, 30),
-          notes: 'Upgrade perangkat kerja harian',
-          createdAt: DateTime(now.year, now.month - 1, 1),
-        ),
-        SavingsPocket(
-          id: 'sp_holiday',
-          name: 'Liburan Akhir Tahun',
-          targetAmount: 5000000.0,
-          currentAmount: 2000000.0,
-          colorValue: 0xFF8B5CF6,
-          icon: 'flight_takeoff',
-          targetDate: DateTime(now.year, 12, 25),
-          notes: 'Tiket & penginapan liburan keluarga',
-          createdAt: DateTime(now.year, now.month, 1),
-        ),
-      ];
-
-      final defaultRecords = [
-        SavingsRecord(
-          id: _uuid.v4(),
-          pocketId: 'sp_emergency',
-          pocketName: 'Dana Darurat',
-          walletId: 'w_bca',
-          walletName: 'Bank BCA',
-          type: 'in',
-          amount: 2500000.0,
-          note: 'Alokasi tabungan awal bulan dari gaji',
-          date: DateTime(now.year, now.month, 2, 10, 0),
-        ),
-        SavingsRecord(
-          id: _uuid.v4(),
-          pocketId: 'sp_laptop',
-          pocketName: 'Beli Gadget / Laptop',
-          walletId: 'w_bca',
-          walletName: 'Bank BCA',
-          type: 'in',
-          amount: 1500000.0,
-          note: 'Tabungan rutin bulanan',
-          date: DateTime(now.year, now.month, 5, 14, 30),
-        ),
-        SavingsRecord(
-          id: _uuid.v4(),
-          pocketId: 'sp_holiday',
-          pocketName: 'Liburan Akhir Tahun',
-          walletId: 'w_gopay',
-          walletName: 'GoPay / E-Wallet',
-          type: 'in',
-          amount: 1000000.0,
-          note: 'Sisa saldo cashback & reward',
-          date: DateTime(now.year, now.month, 10, 16, 20),
-        ),
-        SavingsRecord(
-          id: _uuid.v4(),
-          pocketId: 'sp_holiday',
-          pocketName: 'Liburan Akhir Tahun',
-          walletId: 'w_cash',
-          walletName: 'Dompet Tunai',
-          type: 'out',
-          amount: 250000.0,
-          note: 'Tarik DP booking tiket promo',
-          date: DateTime(now.year, now.month, 12, 19, 0),
-        ),
-      ];
+      final List<SavingsPocket> defaultPockets = [];
+      final List<SavingsRecord> defaultRecords = [];
 
       await saveSavingsPockets(defaultPockets);
       await saveSavingsRecords(defaultRecords);
     }
+  }
+
+  // Bersihkan seluruh data transaksi dan kembalikan ke kondisi awal bersih
+  Future<void> clearFinancialData() async {
+    await _prefs.remove(_keyWallets);
+    await _prefs.remove(_keyTransactions);
+    await _prefs.remove(_keyBudgets);
+    await _prefs.remove(_keySavingsPockets);
+    await _prefs.remove(_keySavingsRecords);
+    await _prefs.remove(_keyIsInit);
+    await _seedInitialDataIfNeeded();
+    await _seedSavingsIfNeeded();
   }
 
   // --- Wallets ---
@@ -324,7 +165,15 @@ class StorageService {
     await saveWallets(wallets);
   }
 
-  // --- Categories ---
+  Future<bool> deleteWallet(String id) async {
+    final wallets = getWallets();
+    if (wallets.length <= 1) return false;
+    wallets.removeWhere((w) => w.id == id);
+    await saveWallets(wallets);
+    return true;
+  }
+
+  // Categories
   List<CategoryItem> getCategories() {
     final raw = _prefs.getString(_keyCategories);
     if (raw == null) return [];
@@ -337,7 +186,19 @@ class StorageService {
     await _prefs.setString(_keyCategories, raw);
   }
 
-  // --- Budgets ---
+  Future<void> addCategory(CategoryItem category) async {
+    final categories = getCategories();
+    categories.add(category);
+    await saveCategories(categories);
+  }
+
+  Future<void> deleteCategory(String id) async {
+    final categories = getCategories();
+    categories.removeWhere((c) => c.id == id);
+    await saveCategories(categories);
+  }
+
+  // Budgets
   List<Budget> getBudgets(int month, int year) {
     final raw = _prefs.getString(_keyBudgets);
     if (raw == null) return [];
@@ -368,6 +229,17 @@ class StorageService {
       month: month,
       year: year,
     ));
+    await saveBudgets(all);
+  }
+
+  Future<void> deleteBudget(String categoryId, int month, int year) async {
+    final raw = _prefs.getString(_keyBudgets);
+    List<Budget> all = [];
+    if (raw != null) {
+      final List<dynamic> decoded = jsonDecode(raw);
+      all = decoded.map((e) => Budget.fromJson(e)).toList();
+    }
+    all.removeWhere((b) => b.categoryId == categoryId && b.month == month && b.year == year);
     await saveBudgets(all);
   }
 
@@ -462,8 +334,66 @@ class StorageService {
     return list.fold(0.0, (sum, t) => sum + t.amount);
   }
 
+  double getDailyIncome(DateTime date) {
+    final list = getTransactions().where((t) =>
+        t.date.year == date.year &&
+        t.date.month == date.month &&
+        t.date.day == date.day &&
+        t.type == 'income');
+    return list.fold(0.0, (sum, t) => sum + t.amount);
+  }
+
+  double getDailyExpense(DateTime date) {
+    final list = getTransactions().where((t) =>
+        t.date.year == date.year &&
+        t.date.month == date.month &&
+        t.date.day == date.day &&
+        t.type == 'expense');
+    return list.fold(0.0, (sum, t) => sum + t.amount);
+  }
+
+  double getWeeklyIncome(DateTime date) {
+    final startOfWeek = DateTime(date.year, date.month, date.day).subtract(Duration(days: date.weekday - 1));
+    final endOfWeek = startOfWeek.add(const Duration(days: 7));
+    final list = getTransactions().where((t) =>
+        t.type == 'income' &&
+        !t.date.isBefore(startOfWeek) &&
+        t.date.isBefore(endOfWeek));
+    return list.fold(0.0, (sum, t) => sum + t.amount);
+  }
+
+  double getWeeklyExpense(DateTime date) {
+    final startOfWeek = DateTime(date.year, date.month, date.day).subtract(Duration(days: date.weekday - 1));
+    final endOfWeek = startOfWeek.add(const Duration(days: 7));
+    final list = getTransactions().where((t) =>
+        t.type == 'expense' &&
+        !t.date.isBefore(startOfWeek) &&
+        t.date.isBefore(endOfWeek));
+    return list.fold(0.0, (sum, t) => sum + t.amount);
+  }
+
+  List<TransactionItem> getPeriodTransactions(String period, DateTime date) {
+    final all = getTransactions();
+    if (period == 'daily') {
+      return all.where((t) =>
+          t.date.year == date.year &&
+          t.date.month == date.month &&
+          t.date.day == date.day).toList();
+    } else if (period == 'weekly') {
+      final startOfWeek = DateTime(date.year, date.month, date.day).subtract(Duration(days: date.weekday - 1));
+      final endOfWeek = startOfWeek.add(const Duration(days: 7));
+      return all.where((t) =>
+          !t.date.isBefore(startOfWeek) &&
+          t.date.isBefore(endOfWeek)).toList();
+    } else {
+      return all.where((t) =>
+          t.date.year == date.year &&
+          t.date.month == date.month).toList();
+    }
+  }
+
   // ==========================================
-  // --- FITUR TABUNGAN (SAVINGS & GOALS) ---
+  // FITUR TABUNGAN (SAVINGS & GOALS)
   // ==========================================
 
   List<SavingsPocket> getSavingsPockets() {
@@ -497,6 +427,39 @@ class StorageService {
     final list = getSavingsPockets();
     list.removeWhere((p) => p.id == id);
     await saveSavingsPockets(list);
+  }
+
+  Future<void> deleteSavingsPocketWithRefund(String pocketId, {String? targetWalletId}) async {
+    final pockets = getSavingsPockets();
+    final index = pockets.indexWhere((p) => p.id == pocketId);
+    if (index == -1) return;
+
+    final pocket = pockets[index];
+    if (pocket.currentAmount > 0) {
+      final wallets = getWallets();
+      final wallet = targetWalletId != null
+          ? wallets.firstWhere((w) => w.id == targetWalletId, orElse: () => wallets.first)
+          : wallets.first;
+      wallet.balance += pocket.currentAmount;
+      await saveWallets(wallets);
+
+      final records = getSavingsRecords();
+      records.add(SavingsRecord(
+        id: _uuid.v4(),
+        pocketId: pocket.id,
+        pocketName: pocket.name,
+        walletId: wallet.id,
+        walletName: wallet.name,
+        amount: pocket.currentAmount,
+        type: 'out',
+        note: 'Penutupan pos kantong: ${pocket.name}',
+        date: DateTime.now(),
+      ));
+      await saveSavingsRecords(records);
+    }
+
+    pockets.removeAt(index);
+    await saveSavingsPockets(pockets);
   }
 
   List<SavingsRecord> getSavingsRecords() {

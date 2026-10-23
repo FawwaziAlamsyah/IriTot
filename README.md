@@ -1,5 +1,7 @@
 # IRITOT: Personal Finance Tracker
 
+<!-- flutter run -d chrome -->
+
 A sleek, 100% offline, privacy-first personal finance app built with Flutter.
 
 ## Features

@@ -4,7 +4,6 @@ import '../models/transaction_item.dart';
 import '../models/category.dart';
 import '../models/budget.dart';
 import '../models/wallet.dart';
-import '../models/savings_pocket.dart';
 import '../services/storage_service.dart';
 import '../services/ai_service.dart';
 import '../theme/app_theme.dart';
@@ -41,6 +40,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   bool _isBalanceHidden = false;
+  String _spendingPeriod = 'monthly'; // 'daily', 'weekly', 'monthly'
 
   @override
   void initState() {
@@ -72,6 +72,76 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     symbol: 'Rp ',
     decimalDigits: 0,
   );
+
+  Widget _buildPeriodFilterTab(String key, String label) {
+    final isSelected = _spendingPeriod == key;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _spendingPeriod = key),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          decoration: BoxDecoration(
+            color: isSelected ? AppTheme.cyanAccent : Colors.transparent,
+            borderRadius: BorderRadius.circular(9),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+              color: isSelected ? Colors.black : AppTheme.textMuted,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _confirmDeleteTransaction(TransactionItem t) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: AppTheme.surfaceDark,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: AppTheme.borderDark),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.delete_outline, color: AppTheme.coralRose, size: 22),
+            SizedBox(width: 8),
+            Text('Hapus Transaksi', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+          ],
+        ),
+        content: Text(
+          widget.localeService?.t('deleteTransactionConfirm') ?? 'Hapus transaksi ini? Saldo dompet akan disesuaikan kembali.',
+          style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: Text(widget.localeService?.t('cancel') ?? 'Batal', style: const TextStyle(color: AppTheme.textMuted)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(dialogCtx);
+              await widget.storageService.deleteTransaction(t.id);
+              if (mounted) {
+                setState(() {});
+                widget.onDataChanged();
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.coralRose,
+              foregroundColor: Colors.white,
+            ),
+            child: Text(widget.localeService?.t('delete') ?? 'Hapus', style: const TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
 
   void _openAddModal({String? initialType, bool openWithVoice = false}) {
     showModalBottomSheet(
@@ -162,10 +232,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final transactions = widget.storageService.getTransactions();
     final categories = widget.storageService.getCategories();
     final budgets = widget.storageService.getBudgets(now.month, now.year);
-    final totalSavings = widget.storageService.getTotalSavingsBalance();
-    final monthlySavingsIn = widget.storageService.getMonthlySavingsIn(now.month, now.year);
-    final monthlySavingsOut = widget.storageService.getMonthlySavingsOut(now.month, now.year);
-    final savingsPockets = widget.storageService.getSavingsPockets();
 
     final catMap = {for (var c in categories) c.id: c};
     final walletMap = {for (var w in wallets) w.id: w};
@@ -219,6 +285,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         children: [
                           Row(
                             children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(5),
+                                child: Image.asset(
+                                  'assets/images/app_logo.png',
+                                  width: 18,
+                                  height: 18,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
                               const Text(
                                 'IRITOT',
                                 style: TextStyle(
@@ -328,8 +403,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   dividerColor: AppTheme.borderDark,
                   dividerHeight: 1.0,
                   tabs: [
-                    Tab(text: widget.localeService?.t('tabDailySpending') ?? 'Pemakaian Sehari-hari'),
-                    Tab(text: widget.localeService?.t('tabSavings') ?? 'Tabungan'),
+                    Tab(text: widget.localeService?.t('tabDailySpending') ?? 'Savings'),
+                    Tab(text: widget.localeService?.t('tabSavings') ?? 'Pocket'),
                   ],
                 ),
               ),
@@ -350,10 +425,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     transactions: transactions,
                     categories: categories,
                     budgets: budgets,
-                    totalSavings: totalSavings,
-                    monthlySavingsIn: monthlySavingsIn,
-                    monthlySavingsOut: monthlySavingsOut,
-                    savingsPockets: savingsPockets,
                     catMap: catMap,
                     walletMap: walletMap,
                   ),
@@ -386,304 +457,173 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     required List<TransactionItem> transactions,
     required List<CategoryItem> categories,
     required List<Budget> budgets,
-    required double totalSavings,
-    required double monthlySavingsIn,
-    required double monthlySavingsOut,
-    required List<SavingsPocket> savingsPockets,
     required Map<String, CategoryItem> catMap,
     required Map<String, Wallet> walletMap,
   }) {
+    final startOfWeek = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
+    final endOfWeek = startOfWeek.add(const Duration(days: 6));
+
+    double periodIncome;
+    double periodExpense;
+    String periodLabel;
+    String periodRange;
+
+    if (_spendingPeriod == 'daily') {
+      periodIncome = widget.storageService.getDailyIncome(now);
+      periodExpense = widget.storageService.getDailyExpense(now);
+      periodLabel = widget.localeService?.t('periodDaily') ?? 'Harian';
+      periodRange = DateFormat('d MMMM yyyy', widget.localeService?.isIndonesian == true ? 'id_ID' : 'en_US').format(now);
+    } else if (_spendingPeriod == 'weekly') {
+      periodIncome = widget.storageService.getWeeklyIncome(now);
+      periodExpense = widget.storageService.getWeeklyExpense(now);
+      periodLabel = widget.localeService?.t('periodWeekly') ?? 'Mingguan';
+      final s = DateFormat('d MMM', widget.localeService?.isIndonesian == true ? 'id_ID' : 'en_US').format(startOfWeek);
+      final e = DateFormat('d MMM yyyy', widget.localeService?.isIndonesian == true ? 'id_ID' : 'en_US').format(endOfWeek);
+      periodRange = '$s - $e';
+    } else {
+      periodIncome = monthlyIncome;
+      periodExpense = monthlyExpense;
+      periodLabel = widget.localeService?.t('periodMonthly') ?? 'Bulanan';
+      periodRange = DateFormat('MMMM yyyy', widget.localeService?.isIndonesian == true ? 'id_ID' : 'en_US').format(now);
+    }
+
+    final periodTransactions = widget.storageService.getPeriodTransactions(_spendingPeriod, now);
+
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-
-              // Hero Balance Card
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF161F30), Color(0xFF0F1726)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: AppTheme.borderDark, width: 1.2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.4),
-                      blurRadius: 16,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
+          // Hero Balance Card
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF161F30), Color(0xFF0F1726)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: AppTheme.borderDark, width: 1.2),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.4),
+                  blurRadius: 16,
+                  offset: const Offset(0, 8),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          widget.localeService?.t('totalCashBalance') ?? 'TOTAL CASH BALANCE',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.8,
-                            color: AppTheme.textMuted,
-                          ),
-                        ),
-                        Text(
-                          DateFormat('MMMM yyyy', widget.localeService?.isIndonesian == true ? 'id_ID' : 'en_US').format(now),
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.emeraldGreen,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
                     Text(
-                      _isBalanceHidden ? 'Rp ••••••••' : _currencyFormat.format(totalBalance),
+                      widget.localeService?.t('totalCashBalance') ?? 'TOTAL CASH BALANCE',
                       style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5,
-                        color: AppTheme.textPrimary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.8,
+                        color: AppTheme.textMuted,
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.only(top: 14),
-                      decoration: const BoxDecoration(
-                        border: Border(top: BorderSide(color: Color(0xFF1D2A40))),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(widget.localeService?.t('income') ?? 'Income', style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
-                                const SizedBox(height: 2),
-                                Text(
-                                  _isBalanceHidden ? '+Rp •••' : '+${_currencyFormat.format(monthlyIncome)}',
-                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.emeraldGreen),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Container(width: 1, height: 28, color: const Color(0xFF1D2A40)),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(widget.localeService?.t('expense') ?? 'Expense', style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
-                                const SizedBox(height: 2),
-                                Text(
-                                  _isBalanceHidden ? '-Rp •••' : '-${_currencyFormat.format(monthlyExpense)}',
-                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.coralRose),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                    Text(
+                      periodRange,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.emeraldGreen,
                       ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 20),
-
-              // Dompet Saya (Wallets Carousel)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    widget.localeService?.t('secWallets') ?? 'MY WALLETS & ACCOUNTS',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
-                      color: AppTheme.textSecondary,
-                    ),
+                const SizedBox(height: 8),
+                Text(
+                  _isBalanceHidden ? 'Rp ••••••••' : _currencyFormat.format(totalBalance),
+                  style: const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
+                    color: AppTheme.textPrimary,
                   ),
-                  TextButton(
-                    onPressed: () => widget.onNavigateToTab(4),
-                    style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
-                    child: Text(widget.localeService?.t('manage') ?? 'Manage', style: const TextStyle(fontSize: 12, color: AppTheme.cyanAccent)),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                height: 80,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: wallets.length,
-                  separatorBuilder: (context, index) => const SizedBox(width: 10),
-                  itemBuilder: (context, index) {
-                    final wallet = wallets[index];
-                    return Container(
-                      width: 140,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppTheme.surfaceDark,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppTheme.borderDark),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            wallet.name,
-                            style: const TextStyle(fontSize: 11, color: AppTheme.textMuted, fontWeight: FontWeight.w500),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _isBalanceHidden ? '••••••' : _currencyFormat.format(wallet.balance),
-                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    );
-                  },
                 ),
-              ),
-              const SizedBox(height: 20),
+                const SizedBox(height: 14),
 
-              // Tabungan & Celengan (Savings Summary Card)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    widget.localeService?.t('secSavings') ?? 'SAVINGS & POCKETS',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
-                      color: AppTheme.textSecondary,
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () => _tabController.animateTo(1),
-                    style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
-                    child: Text(widget.localeService?.t('seeAll') ?? 'See All', style: const TextStyle(fontSize: 12, color: AppTheme.emeraldGreen)),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              GestureDetector(
-                onTap: () => _tabController.animateTo(1),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
+                // Filter Tab/Pills: Harian | Mingguan | Bulanan
+                Container(
+                  padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF132225), Color(0xFF0F1A1C)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: AppTheme.emeraldGreen.withValues(alpha: 0.3)),
+                    color: AppTheme.surfaceLighter,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.borderDark),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 28,
-                                height: 28,
-                                decoration: BoxDecoration(
-                                  color: AppTheme.emeraldGreen.withValues(alpha: 0.2),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Icon(Icons.savings_rounded, color: AppTheme.emeraldGreen, size: 16),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                widget.localeService?.t('totalSaved') ?? 'Total Saved',
-                                style: const TextStyle(fontSize: 12, color: AppTheme.textMuted, fontWeight: FontWeight.w600),
-                              ),
-                            ],
-                          ),
-                          const Icon(Icons.chevron_right, size: 18, color: AppTheme.emeraldGreen),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _isBalanceHidden ? 'Rp ••••••••' : _currencyFormat.format(totalSavings),
-                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppTheme.textPrimary),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Row(
-                              children: [
-                                const Icon(Icons.arrow_downward, color: AppTheme.emeraldGreen, size: 14),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '${widget.localeService?.t('inflow') ?? 'In'}: ${_isBalanceHidden ? '•••' : _currencyFormat.format(monthlySavingsIn)}',
-                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.emeraldGreen),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Expanded(
-                            child: Row(
-                              children: [
-                                const Icon(Icons.arrow_upward, color: AppTheme.coralRose, size: 14),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '${widget.localeService?.t('outflow') ?? 'Out'}: ${_isBalanceHidden ? '•••' : _currencyFormat.format(monthlySavingsOut)}',
-                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.coralRose),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (savingsPockets.isNotEmpty) ...[
-                        const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 4,
-                          children: savingsPockets.take(3).map((p) {
-                            return Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: Color(p.colorValue).withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: Color(p.colorValue).withValues(alpha: 0.3)),
-                              ),
-                              child: Text(
-                                '${p.name}: ${p.progressPercent}%',
-                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(p.colorValue)),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ],
+                      _buildPeriodFilterTab('daily', widget.localeService?.t('periodDaily') ?? 'Harian'),
+                      _buildPeriodFilterTab('weekly', widget.localeService?.t('periodWeekly') ?? 'Mingguan'),
+                      _buildPeriodFilterTab('monthly', widget.localeService?.t('periodMonthly') ?? 'Bulanan'),
                     ],
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
+                const SizedBox(height: 14),
 
-              // Aksi Cepat
+                Container(
+                  padding: const EdgeInsets.only(top: 14),
+                  decoration: const BoxDecoration(
+                    border: Border(top: BorderSide(color: Color(0xFF1D2A40))),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${widget.localeService?.t('income') ?? 'Income'} ($periodLabel)',
+                              style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _isBalanceHidden ? '+Rp •••' : '+${_currencyFormat.format(periodIncome)}',
+                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.emeraldGreen),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(width: 1, height: 28, color: const Color(0xFF1D2A40)),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${widget.localeService?.t('expense') ?? 'Expense'} ($periodLabel)',
+                              style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _isBalanceHidden ? '-Rp •••' : '-${_currencyFormat.format(periodExpense)}',
+                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.coralRose),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Dompet Saya (Wallets Carousel)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
               Text(
-                widget.localeService?.t('quickActions') ?? 'QUICK ACTIONS',
+                widget.localeService?.t('secWallets') ?? 'MY WALLETS & ACCOUNTS',
                 style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
@@ -691,189 +631,297 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   color: AppTheme.textSecondary,
                 ),
               ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  _buildActionButton(
-                    icon: Icons.edit_note,
-                    label: widget.localeService?.t('navLog') ?? 'Log',
-                    color: AppTheme.emeraldGreen,
-                    onTap: () => _openAddModal(),
-                  ),
-                  const SizedBox(width: 8),
-                  _buildActionButton(
-                    icon: Icons.mic,
-                    label: widget.localeService?.t('actionVoice') ?? 'Voice',
-                    color: AppTheme.violetAI,
-                    onTap: () => _openAddModal(openWithVoice: true),
-                  ),
-                  const SizedBox(width: 8),
-                  _buildActionButton(
-                    icon: Icons.document_scanner,
-                    label: widget.localeService?.t('actionScan') ?? 'Receipt',
-                    color: AppTheme.cyanAccent,
-                    onTap: _showScanReceiptDialog,
-                  ),
-                  const SizedBox(width: 8),
-                  _buildActionButton(
-                    icon: Icons.swap_horiz,
-                    label: 'Transfer',
-                    color: AppTheme.amberWarning,
-                    onTap: () => _openAddModal(initialType: 'transfer'),
-                  ),
-                ],
+              TextButton(
+                onPressed: () => widget.onNavigateToTab(4),
+                style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
+                child: Text(widget.localeService?.t('manage') ?? 'Manage', style: const TextStyle(fontSize: 12, color: AppTheme.cyanAccent)),
               ),
-              const SizedBox(height: 22),
-
-              // Pantauan Anggaran
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    widget.localeService?.t('secBudget') ?? 'MONTHLY BUDGET PROGRESS',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
-                      color: AppTheme.textSecondary,
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => BudgetScreen(
-                            storageService: widget.storageService,
-                            onDataChanged: widget.onDataChanged,
-                          ),
-                        ),
-                      );
-                    },
-                    style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
-                    child: Text(widget.localeService?.t('seeAll') ?? 'See All', style: const TextStyle(fontSize: 12, color: AppTheme.cyanAccent)),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              _buildBudgetCard(budgets, transactions, catMap, now),
-              const SizedBox(height: 22),
-
-              // Transaksi Terbaru
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    widget.localeService?.t('secRecentTransactions') ?? 'RECENT TRANSACTIONS',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
-                      color: AppTheme.textSecondary,
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () => widget.onNavigateToTab(3),
-                    style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
-                    child: Text(widget.localeService?.t('seeAll') ?? 'See All', style: const TextStyle(fontSize: 12, color: AppTheme.cyanAccent)),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-
-              if (transactions.isEmpty)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 28),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 80,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: wallets.length,
+              separatorBuilder: (context, index) => const SizedBox(width: 10),
+              itemBuilder: (context, index) {
+                final wallet = wallets[index];
+                return Container(
+                  width: 140,
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: AppTheme.surfaceDark,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: AppTheme.borderDark),
                   ),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.receipt_long, size: 36, color: AppTheme.textMuted),
-                      const SizedBox(height: 8),
-                      Text(widget.localeService?.t('noTransactions') ?? 'No transactions recorded yet', style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
-                      const Text('Press (+) below to log your transaction.', style: TextStyle(color: AppTheme.textMuted, fontSize: 11)),
+                      Text(
+                        wallet.name,
+                        style: const TextStyle(fontSize: 11, color: AppTheme.textMuted, fontWeight: FontWeight.w500),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _isBalanceHidden ? '••••••' : _currencyFormat.format(wallet.balance),
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ],
                   ),
-                )
-              else
-                ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: transactions.take(6).length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 8),
-                  itemBuilder: (context, index) {
-                    final t = transactions[index];
-                    final cat = catMap[t.categoryId];
-                    final wallet = walletMap[t.walletId];
-                    final isExp = t.type == 'expense';
-                    final isInc = t.type == 'income';
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 20),
 
-                    return Dismissible(
-                      key: Key(t.id),
-                      direction: DismissDirection.endToStart,
-                      background: Container(
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.only(right: 16),
-                        decoration: BoxDecoration(
-                          color: AppTheme.coralRose,
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: const Icon(Icons.delete, color: Colors.white),
+          // Aksi Cepat
+          Text(
+            widget.localeService?.t('quickActions') ?? 'QUICK ACTIONS',
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.5,
+              color: AppTheme.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              _buildActionButton(
+                icon: Icons.edit_note,
+                label: widget.localeService?.t('navLog') ?? 'Log',
+                color: AppTheme.emeraldGreen,
+                onTap: () => _openAddModal(),
+              ),
+              const SizedBox(width: 8),
+              _buildActionButton(
+                icon: Icons.mic,
+                label: widget.localeService?.t('actionVoice') ?? 'Voice',
+                color: AppTheme.violetAI,
+                onTap: () => _openAddModal(openWithVoice: true),
+              ),
+              const SizedBox(width: 8),
+              _buildActionButton(
+                icon: Icons.document_scanner,
+                label: widget.localeService?.t('actionScan') ?? 'Receipt',
+                color: AppTheme.cyanAccent,
+                onTap: _showScanReceiptDialog,
+              ),
+              const SizedBox(width: 8),
+              _buildActionButton(
+                icon: Icons.swap_horiz,
+                label: 'Transfer',
+                color: AppTheme.amberWarning,
+                onTap: () => _openAddModal(initialType: 'transfer'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+
+          // Pantauan Anggaran
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                widget.localeService?.t('secBudget') ?? 'MONTHLY BUDGET PROGRESS',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                  color: AppTheme.textSecondary,
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => BudgetScreen(
+                        storageService: widget.storageService,
+                        onDataChanged: widget.onDataChanged,
                       ),
-                      onDismissed: (_) async {
-                        await widget.storageService.deleteTransaction(t.id);
-                        setState(() {});
-                        widget.onDataChanged();
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: AppTheme.surfaceDark,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppTheme.borderDark),
+                    ),
+                  );
+                },
+                style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
+                child: Text(widget.localeService?.t('seeAll') ?? 'See All', style: const TextStyle(fontSize: 12, color: AppTheme.cyanAccent)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _buildBudgetCard(budgets, transactions, catMap, now),
+          const SizedBox(height: 22),
+
+          // Transaksi Terbaru
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '${widget.localeService?.t('secRecentTransactions') ?? 'RECENT TRANSACTIONS'} ($periodLabel)',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                  color: AppTheme.textSecondary,
+                ),
+              ),
+              TextButton(
+                onPressed: () => widget.onNavigateToTab(3),
+                style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
+                child: Text(widget.localeService?.t('seeAll') ?? 'See All', style: const TextStyle(fontSize: 12, color: AppTheme.cyanAccent)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          if (periodTransactions.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 28),
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceDark,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppTheme.borderDark),
+              ),
+              child: Column(
+                children: [
+                  const Icon(Icons.receipt_long, size: 36, color: AppTheme.textMuted),
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.localeService?.t('noTransactionsPeriod') ?? 'Belum ada transaksi pada periode ini',
+                    style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text('Tekan (+) di bawah untuk mencatat transaksi.', style: TextStyle(color: AppTheme.textMuted, fontSize: 11)),
+                ],
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: periodTransactions.take(8).length,
+              separatorBuilder: (context, index) => const SizedBox(height: 8),
+              itemBuilder: (context, index) {
+                final t = periodTransactions[index];
+                final cat = catMap[t.categoryId];
+                final wallet = walletMap[t.walletId];
+                final isExp = t.type == 'expense';
+                final isInc = t.type == 'income';
+
+                return Dismissible(
+                  key: Key(t.id),
+                  direction: DismissDirection.endToStart,
+                  confirmDismiss: (_) async {
+                    bool confirm = false;
+                    await showDialog(
+                      context: context,
+                      builder: (dialogCtx) => AlertDialog(
+                        backgroundColor: AppTheme.surfaceDark,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                          side: const BorderSide(color: AppTheme.borderDark),
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        title: const Row(
                           children: [
-                            Row(
-                              children: [
-                                Container(
-                                  width: 38,
-                                  height: 38,
-                                  decoration: BoxDecoration(
-                                    color: cat != null ? Color(cat.colorValue).withValues(alpha: 0.18) : AppTheme.surfaceLighter,
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Center(
-                                    child: Icon(
-                                      isInc ? Icons.arrow_downward : (t.type == 'transfer' ? Icons.swap_horiz : Icons.shopping_bag_outlined),
-                                      color: cat != null ? Color(cat.colorValue) : AppTheme.textSecondary,
-                                      size: 18,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      t.note,
-                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      '${cat?.name ?? 'Umum'} • ${wallet?.name ?? 'Kas'} • ${DateFormat('dd MMM', 'id_ID').format(t.date)}',
-                                      style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
-                                    ),
-                                  ],
-                                ),
-                              ],
+                            Icon(Icons.delete_outline, color: AppTheme.coralRose, size: 22),
+                            SizedBox(width: 8),
+                            Text('Hapus Transaksi', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+                          ],
+                        ),
+                        content: Text(
+                          widget.localeService?.t('deleteTransactionConfirm') ?? 'Hapus transaksi ini? Saldo dompet akan disesuaikan kembali.',
+                          style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(dialogCtx),
+                            child: Text(widget.localeService?.t('cancel') ?? 'Batal', style: const TextStyle(color: AppTheme.textMuted)),
+                          ),
+                          ElevatedButton(
+                            onPressed: () {
+                              confirm = true;
+                              Navigator.pop(dialogCtx);
+                            },
+                            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.coralRose, foregroundColor: Colors.white),
+                            child: Text(widget.localeService?.t('delete') ?? 'Hapus', style: const TextStyle(fontWeight: FontWeight.w700)),
+                          ),
+                        ],
+                      ),
+                    );
+                    return confirm;
+                  },
+                  background: Container(
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.only(right: 16),
+                    decoration: BoxDecoration(
+                      color: AppTheme.coralRose,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(Icons.delete, color: Colors.white),
+                  ),
+                  onDismissed: (_) async {
+                    await widget.storageService.deleteTransaction(t.id);
+                    setState(() {});
+                    widget.onDataChanged();
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surfaceDark,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppTheme.borderDark),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: cat != null ? Color(cat.colorValue).withValues(alpha: 0.18) : AppTheme.surfaceLighter,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Center(
+                            child: Icon(
+                              isInc ? Icons.arrow_downward : (t.type == 'transfer' ? Icons.swap_horiz : Icons.shopping_bag_outlined),
+                              color: cat != null ? Color(cat.colorValue) : AppTheme.textSecondary,
+                              size: 18,
                             ),
-                            Text(
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                t.note.trim().isEmpty ? (cat?.name ?? 'Transaksi') : t.note,
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${cat?.name ?? 'Umum'} • ${wallet?.name ?? 'Kas'} • ${DateFormat('dd MMM', 'id_ID').format(t.date)}',
+                                style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 110),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerRight,
+                            child: Text(
                               isExp ? '-${_currencyFormat.format(t.amount)}' : (isInc ? '+${_currencyFormat.format(t.amount)}' : _currencyFormat.format(t.amount)),
                               style: TextStyle(
                                 fontSize: 13,
@@ -881,16 +929,27 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                 color: isExp ? AppTheme.coralRose : (isInc ? AppTheme.emeraldGreen : AppTheme.cyanAccent),
                               ),
                             ),
-                          ],
+                          ),
                         ),
-                      ),
-                    );
-                  },
-                ),
-              const SizedBox(height: 24),
-            ],
-          ),
-        );
+                        const SizedBox(width: 6),
+                        InkWell(
+                          onTap: () => _confirmDeleteTransaction(t),
+                          borderRadius: BorderRadius.circular(8),
+                          child: const Padding(
+                            padding: EdgeInsets.all(4),
+                            child: Icon(Icons.delete_outline, size: 16, color: AppTheme.textMuted),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
   }
 
   Widget _buildActionButton({

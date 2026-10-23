@@ -177,11 +177,15 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                                       ),
                                     ],
                                   ),
-                                  child: const Center(
-                                    child: Icon(
-                                      Icons.trending_up_rounded,
-                                      color: AppTheme.cyanAccent,
-                                      size: 34,
+                                  child: Center(
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(16),
+                                      child: Image.asset(
+                                        'assets/images/app_logo.png',
+                                        width: 52,
+                                        height: 52,
+                                        fit: BoxFit.contain,
+                                      ),
                                     ),
                                   ),
                                 ),
