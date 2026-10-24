@@ -7,6 +7,9 @@ import 'package:iritot/models/transaction_item.dart';
 import 'package:iritot/models/savings_pocket.dart';
 import 'package:iritot/services/csv_service.dart';
 import 'package:iritot/services/ai_service.dart';
+import 'package:iritot/models/savings_record.dart';
+import 'package:iritot/widgets/currency_input_formatter.dart';
+import 'package:flutter/services.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -346,5 +349,228 @@ rec_3,2026-03-01 12:00:00,Krom,in,20000000,THR,20000000
     expect(exported.contains('SuperBank'), isTrue);
     expect(exported.contains('Krom'), isTrue);
     expect(exported.contains('15000000'), isTrue);
+  });
+
+  test('ThousandsSeparatorInputFormatter formats dot separator and parses correctly', () {
+    final formatter = ThousandsSeparatorInputFormatter();
+
+    // format helper
+    expect(ThousandsSeparatorInputFormatter.format(1000), '1.000');
+    expect(ThousandsSeparatorInputFormatter.format(1000000), '1.000.000');
+    expect(ThousandsSeparatorInputFormatter.format(250000), '250.000');
+    expect(ThousandsSeparatorInputFormatter.format(0), '');
+
+    // parse helper
+    expect(ThousandsSeparatorInputFormatter.parse('1.000.000'), 1000000.0);
+    expect(ThousandsSeparatorInputFormatter.parse('250.000'), 250000.0);
+    expect(ThousandsSeparatorInputFormatter.parse(''), 0.0);
+
+    // formatEditUpdate simulation: typing '1000000'
+    final updated = formatter.formatEditUpdate(
+      const TextEditingValue(text: '1000'),
+      const TextEditingValue(text: '1000000', selection: TextSelection.collapsed(offset: 7)),
+    );
+    expect(updated.text, '1.000.000');
+  });
+
+  test('Savings transfer between pockets updates balances and logs distinct records', () async {
+    final storage = await StorageService.init();
+
+    // Create 2 pockets
+    await storage.addSavingsPocket(SavingsPocket(
+      id: 'pocket_a',
+      name: 'Dana Darurat',
+      targetAmount: 5000000,
+      currentAmount: 2000000,
+      colorValue: 0xFF10B981,
+      icon: 'savings',
+      createdAt: DateTime.now(),
+    ));
+
+    await storage.addSavingsPocket(SavingsPocket(
+      id: 'pocket_b',
+      name: 'Liburan Akhir Tahun',
+      targetAmount: 3000000,
+      currentAmount: 500000,
+      colorValue: 0xFF38BDF8,
+      icon: 'beach_access',
+      createdAt: DateTime.now(),
+    ));
+
+    // Transfer 500.000 from pocket_a to pocket_b
+    await storage.transferBetweenPockets(
+      sourcePocketId: 'pocket_a',
+      targetPocketId: 'pocket_b',
+      amount: 500000,
+      note: 'Reallokasi liburan',
+    );
+
+    final pockets = storage.getSavingsPockets();
+    final pA = pockets.firstWhere((p) => p.id == 'pocket_a');
+    final pB = pockets.firstWhere((p) => p.id == 'pocket_b');
+
+    expect(pA.currentAmount, 1500000);
+    expect(pB.currentAmount, 1000000);
+
+    final records = storage.getSavingsRecords();
+    expect(records.length, 2);
+
+    final outRec = records.firstWhere((r) => r.pocketId == 'pocket_a');
+    expect(outRec.isOut, isTrue);
+    expect(outRec.isPocketTransfer, isTrue);
+    expect(outRec.amount, 500000);
+    expect(outRec.transferType, 'pocket_transfer');
+
+    final inRec = records.firstWhere((r) => r.pocketId == 'pocket_b');
+    expect(inRec.isIn, isTrue);
+    expect(inRec.isPocketTransfer, isTrue);
+    expect(inRec.amount, 500000);
+    expect(inRec.transferType, 'pocket_transfer');
+
+    // Insufficient funds guard: try transferring 3.000.000 from pA (has 1.500.000)
+    await storage.transferBetweenPockets(
+      sourcePocketId: 'pocket_a',
+      targetPocketId: 'pocket_b',
+      amount: 3000000,
+    );
+    // Balances should remain untouched
+    final pAAfter = storage.getSavingsPockets().firstWhere((p) => p.id == 'pocket_a');
+    expect(pAAfter.currentAmount, 1500000);
+  });
+
+  test('SavingsRecord serialization preserves transferType and differentiation', () {
+    final record = SavingsRecord(
+      id: 'rec_x',
+      pocketId: 'p1',
+      pocketName: 'Pocket 1',
+      walletId: 'p2',
+      walletName: 'Pocket 2',
+      type: 'in',
+      amount: 750000,
+      note: 'Transfer masuk',
+      date: DateTime.now(),
+      transferType: 'pocket_transfer',
+    );
+
+    final json = record.toJson();
+    expect(json['transferType'], 'pocket_transfer');
+
+    final fromJson = SavingsRecord.fromJson(json);
+    expect(fromJson.isPocketTransfer, isTrue);
+    expect(fromJson.transferType, 'pocket_transfer');
+  });
+
+  test('Budget addition, editing, and overwriting preserves limits', () async {
+    final storage = await StorageService.init();
+    final now = DateTime.now();
+
+    // Set budget
+    await storage.setBudget('cat_food', 1500000, now.month, now.year);
+    var budgets = storage.getBudgets(now.month, now.year);
+    expect(budgets.firstWhere((b) => b.categoryId == 'cat_food').monthlyLimit, 1500000);
+
+    // Edit budget (fix typo or increase)
+    await storage.setBudget('cat_food', 2000000, now.month, now.year);
+    budgets = storage.getBudgets(now.month, now.year);
+    expect(budgets.firstWhere((b) => b.categoryId == 'cat_food').monthlyLimit, 2000000);
+  });
+
+  test('depositToSavings creates spending transaction history and updates pocket and wallet balances', () async {
+    final storage = await StorageService.init();
+    await storage.clearFinancialData();
+
+    // Create a wallet with 5.000.000 balance
+    await storage.addWallet(Wallet(
+      id: 'w_bank_test',
+      name: 'Bank Mandiri',
+      type: 'bank',
+      balance: 5000000,
+      icon: 'account_balance',
+      colorValue: 0xFF10B981,
+    ));
+
+    // Create a target pocket
+    await storage.addSavingsPocket(SavingsPocket(
+      id: 'pocket_emergency',
+      name: 'Dana Darurat',
+      targetAmount: 10000000,
+      currentAmount: 1000000,
+      icon: 'savings',
+      colorValue: 0xFF38BDF8,
+      targetDate: DateTime.now().add(const Duration(days: 90)),
+      createdAt: DateTime.now(),
+    ));
+
+    // Deposit 500.000 without custom note
+    final now = DateTime.now();
+    await storage.depositToSavings(
+      pocketId: 'pocket_emergency',
+      walletId: 'w_bank_test',
+      amount: 500000,
+      note: '',
+      date: now,
+    );
+
+    // Verify pocket balance updated
+    final pocketAfter = storage.getSavingsPockets().firstWhere((p) => p.id == 'pocket_emergency');
+    expect(pocketAfter.currentAmount, 1500000);
+
+    // Verify wallet balance deducted
+    final walletAfter = storage.getWallets().firstWhere((w) => w.id == 'w_bank_test');
+    expect(walletAfter.balance, 4500000);
+
+    // Verify savings records has deposit entry
+    final records = storage.getSavingsRecords();
+    expect(records.any((r) => r.pocketId == 'pocket_emergency' && r.amount == 500000), isTrue);
+
+    // Verify transaction history in spending
+    final transactions = storage.getTransactions();
+    expect(transactions.length, 1);
+    final tx = transactions.first;
+    expect(tx.walletId, 'w_bank_test');
+    expect(tx.amount, 500000);
+    expect(tx.type, 'expense');
+    expect(tx.note, 'Deposit to "Dana Darurat" Pocket');
+    expect(tx.categoryId, 'cat_savings');
+
+    // Verify spending calculations in home screen
+    expect(storage.getDailyExpense(now), 500000);
+    expect(storage.getMonthlyExpense(now.month, now.year), 500000);
+    expect(storage.getPeriodTransactions('daily', now).length, 1);
+
+    // Deposit again with a custom note
+    await storage.depositToSavings(
+      pocketId: 'pocket_emergency',
+      walletId: 'w_bank_test',
+      amount: 250000,
+      note: 'Bonus lembur',
+      date: now,
+    );
+
+    final transactions2 = storage.getTransactions();
+    expect(transactions2.length, 2);
+    final tx2 = transactions2.firstWhere((t) => t.amount == 250000);
+    expect(tx2.note, 'Deposit to "Dana Darurat" Pocket (Bonus lembur)');
+  });
+
+  test('updateWallet updates wallet attributes and balance correctly', () async {
+    final storage = await StorageService.init();
+    final wallets = storage.getWallets();
+    final firstWallet = wallets.first;
+
+    final updated = Wallet(
+      id: firstWallet.id,
+      name: 'Dompet Utama Renamed',
+      type: 'bank',
+      balance: 10000000,
+      icon: 'account_balance',
+      colorValue: 0xFF38BDF8,
+    );
+
+    await storage.updateWallet(updated);
+    final walletAfter = storage.getWallets().firstWhere((w) => w.id == firstWallet.id);
+    expect(walletAfter.name, 'Dompet Utama Renamed');
+    expect(walletAfter.type, 'bank');
+    expect(walletAfter.balance, 10000000);
   });
 }

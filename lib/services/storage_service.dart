@@ -165,6 +165,15 @@ class StorageService {
     await saveWallets(wallets);
   }
 
+  Future<void> updateWallet(Wallet wallet) async {
+    final wallets = getWallets();
+    final index = wallets.indexWhere((w) => w.id == wallet.id);
+    if (index != -1) {
+      wallets[index] = wallet;
+      await saveWallets(wallets);
+    }
+  }
+
   Future<bool> deleteWallet(String id) async {
     final wallets = getWallets();
     if (wallets.length <= 1) return false;
@@ -594,17 +603,36 @@ class StorageService {
     required String note,
     DateTime? date,
   }) async {
+    if (amount <= 0) return;
+
     final pockets = getSavingsPockets();
     final pocket = pockets.firstWhere((p) => p.id == pocketId);
 
     final wallets = getWallets();
     final wallet = wallets.firstWhere((w) => w.id == walletId);
 
+    final txDate = date ?? DateTime.now();
+    final trimmedNote = note.trim();
+
     // 1. Tambah saldo tabungan
     pocket.currentAmount += amount;
 
     // 2. Potong saldo dompet sumber
     wallet.balance -= amount;
+
+    // Format catatan transaksi dan riwayat tabungan
+    final String spendingNote;
+    if (trimmedNote.isEmpty) {
+      spendingNote = 'Deposit to "${pocket.name}" Pocket';
+    } else if (trimmedNote.toLowerCase().startsWith('deposit to')) {
+      spendingNote = trimmedNote;
+    } else {
+      spendingNote = 'Deposit to "${pocket.name}" Pocket ($trimmedNote)';
+    }
+
+    final String savingsRecordNote = trimmedNote.isEmpty
+        ? 'Deposit to "${pocket.name}" Pocket'
+        : trimmedNote;
 
     // 3. Catat riwayat mutasi tabungan
     final records = getSavingsRecords();
@@ -616,13 +644,46 @@ class StorageService {
       walletName: wallet.name,
       type: 'in',
       amount: amount,
-      note: note.trim().isEmpty ? 'Setoran tabungan' : note.trim(),
-      date: date ?? DateTime.now(),
+      note: savingsRecordNote,
+      date: txDate,
+    ));
+
+    // 4. Cari atau buat kategori alokasi tabungan
+    final categories = getCategories();
+    CategoryItem? savingsCat = categories.where((c) => c.id == 'cat_savings').firstOrNull;
+    savingsCat ??= categories.where((c) =>
+      c.name.toLowerCase().contains('tabung') ||
+      c.name.toLowerCase().contains('saving') ||
+      c.name.toLowerCase().contains('pocket')
+    ).firstOrNull;
+    if (savingsCat == null) {
+      savingsCat = CategoryItem(
+        id: 'cat_savings',
+        name: 'Alokasi Tabungan',
+        type: 'expense',
+        icon: 'savings',
+        colorValue: 0xFF10B981,
+      );
+      categories.add(savingsCat);
+      await saveCategories(categories);
+    }
+
+    // 5. Catat ke riwayat transaksi belanja / spending page
+    final transactions = getTransactions();
+    transactions.add(TransactionItem(
+      id: _uuid.v4(),
+      walletId: wallet.id,
+      categoryId: savingsCat.id,
+      type: 'expense',
+      amount: amount,
+      note: spendingNote,
+      date: txDate,
     ));
 
     await saveSavingsPockets(pockets);
     await saveWallets(wallets);
     await saveSavingsRecords(records);
+    await saveTransactions(transactions);
   }
 
   // Tarik Tabungan (Keluar / Withdraw)
@@ -662,6 +723,72 @@ class StorageService {
 
     await saveSavingsPockets(pockets);
     await saveWallets(wallets);
+    await saveSavingsRecords(records);
+  }
+
+  // Pindah Dana Antar Pos Tabungan (Transfer antar Pocket)
+  Future<void> transferBetweenPockets({
+    required String sourcePocketId,
+    required String targetPocketId,
+    required double amount,
+    String? note,
+    DateTime? date,
+  }) async {
+    final pockets = getSavingsPockets();
+    final sourceIndex = pockets.indexWhere((p) => p.id == sourcePocketId);
+    final targetIndex = pockets.indexWhere((p) => p.id == targetPocketId);
+
+    if (sourceIndex == -1 || targetIndex == -1 || sourcePocketId == targetPocketId) {
+      return;
+    }
+
+    final sourcePocket = pockets[sourceIndex];
+    final targetPocket = pockets[targetIndex];
+
+    if (sourcePocket.currentAmount < amount || amount <= 0) {
+      return;
+    }
+
+    // 1. Kurangi saldo pos sumber
+    sourcePocket.currentAmount -= amount;
+    if (sourcePocket.currentAmount < 0) sourcePocket.currentAmount = 0;
+
+    // 2. Tambah saldo pos tujuan
+    targetPocket.currentAmount += amount;
+
+    final records = getSavingsRecords();
+    final txDate = date ?? DateTime.now();
+    final customNote = note != null && note.trim().isNotEmpty ? note.trim() : null;
+
+    // 3. Catat mutasi keluar untuk pos sumber
+    records.add(SavingsRecord(
+      id: _uuid.v4(),
+      pocketId: sourcePocket.id,
+      pocketName: sourcePocket.name,
+      walletId: targetPocket.id,
+      walletName: targetPocket.name,
+      type: 'out',
+      amount: amount,
+      transferType: 'pocket_transfer',
+      note: customNote != null ? 'Pindah ke ${targetPocket.name} ($customNote)' : 'Transfer ke pos ${targetPocket.name}',
+      date: txDate,
+    ));
+
+    // 4. Catat mutasi masuk untuk pos tujuan
+    records.add(SavingsRecord(
+      id: _uuid.v4(),
+      pocketId: targetPocket.id,
+      pocketName: targetPocket.name,
+      walletId: sourcePocket.id,
+      walletName: sourcePocket.name,
+      type: 'in',
+      amount: amount,
+      transferType: 'pocket_transfer',
+      note: customNote != null ? 'Terima dari ${sourcePocket.name} ($customNote)' : 'Transfer dari pos ${sourcePocket.name}',
+      date: txDate,
+    ));
+
+    await saveSavingsPockets(pockets);
     await saveSavingsRecords(records);
   }
 

@@ -11,6 +11,7 @@ import '../services/ai_service.dart';
 import '../services/auth_service.dart';
 import '../services/locale_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/currency_input_formatter.dart';
 
 class SettingsScreen extends StatefulWidget {
   final StorageService storageService;
@@ -108,6 +109,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   TextField(
                     controller: balanceCtrl,
                     keyboardType: TextInputType.number,
+                    inputFormatters: [ThousandsSeparatorInputFormatter()],
                     style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14),
                     decoration: InputDecoration(
                       prefixText: 'Rp ',
@@ -186,6 +188,314 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  void _showEditWalletDialog(Wallet w, {String initialTab = 'topup'}) {
+    String currentTab = initialTab;
+
+    // Top up fields
+    final topUpAmountCtrl = TextEditingController();
+    final topUpNoteCtrl = TextEditingController();
+
+    // Edit info fields
+    final nameCtrl = TextEditingController(text: w.name);
+    final balanceCtrl = TextEditingController(
+      text: ThousandsSeparatorInputFormatter.format(w.balance),
+    );
+    String type = w.type;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogCtx, setDialogState) {
+            final isTopUp = currentTab == 'topup';
+            return AlertDialog(
+              backgroundColor: AppTheme.surfaceDark,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: const BorderSide(color: AppTheme.borderDark),
+              ),
+              titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+              actionsPadding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+              title: Row(
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: Color(w.colorValue).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      w.type == 'bank'
+                          ? Icons.account_balance
+                          : (w.type == 'ewallet' ? Icons.phone_android : Icons.payments),
+                      color: Color(w.colorValue),
+                      size: 16,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          w.name,
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          '${widget.localeService.isIndonesian ? 'Saldo saat ini' : 'Current balance'}: Rp ${ThousandsSeparatorInputFormatter.format(w.balance)}',
+                          style: const TextStyle(fontSize: 11, color: AppTheme.emeraldGreen, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Tab Selector
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surfaceLighter,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppTheme.borderDark),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setDialogState(() => currentTab = 'topup'),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: isTopUp ? AppTheme.emeraldGreen.withValues(alpha: 0.2) : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: isTopUp ? AppTheme.emeraldGreen : Colors.transparent),
+                                ),
+                                child: Text(
+                                  t('tabTopUp'),
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: isTopUp ? FontWeight.w700 : FontWeight.w500,
+                                    color: isTopUp ? AppTheme.emeraldGreen : AppTheme.textSecondary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setDialogState(() => currentTab = 'edit'),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: !isTopUp ? AppTheme.cyanAccent.withValues(alpha: 0.2) : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: !isTopUp ? AppTheme.cyanAccent : Colors.transparent),
+                                ),
+                                child: Text(
+                                  t('tabEditInfo'),
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: !isTopUp ? FontWeight.w700 : FontWeight.w500,
+                                    color: !isTopUp ? AppTheme.cyanAccent : AppTheme.textSecondary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    if (isTopUp) ...[
+                      // Top up view
+                      Text(t('topUpAmountLabel'), style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary, fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: topUpAmountCtrl,
+                        keyboardType: TextInputType.number,
+                        autofocus: true,
+                        inputFormatters: [ThousandsSeparatorInputFormatter()],
+                        style: const TextStyle(color: AppTheme.emeraldGreen, fontSize: 18, fontWeight: FontWeight.w700),
+                        decoration: InputDecoration(
+                          prefixText: 'Rp ',
+                          prefixStyle: const TextStyle(color: AppTheme.emeraldGreen, fontSize: 18, fontWeight: FontWeight.w700),
+                          filled: true,
+                          fillColor: AppTheme.surfaceLighter,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.borderDark)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      Text(t('noteOptional'), style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: topUpNoteCtrl,
+                        style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
+                        decoration: InputDecoration(
+                          hintText: t('topUpNoteHint'),
+                          hintStyle: TextStyle(color: AppTheme.textMuted.withValues(alpha: 0.7), fontSize: 12),
+                          filled: true,
+                          fillColor: AppTheme.surfaceLighter,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.borderDark)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        widget.localeService.isIndonesian
+                            ? 'Dana akan dicatat sebagai transaksi pemasukan dan menambah saldo kas.'
+                            : 'Funds will be recorded as an income transaction and increase wallet cash.',
+                        style: TextStyle(fontSize: 10, color: AppTheme.textMuted.withValues(alpha: 0.8)),
+                      ),
+                    ] else ...[
+                      // Edit info view
+                      Text(t('walletNameLabel'), style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: nameCtrl,
+                        style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14),
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: AppTheme.surfaceLighter,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.borderDark)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      Text(t('walletBalanceLabel'), style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: balanceCtrl,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [ThousandsSeparatorInputFormatter()],
+                        style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14),
+                        decoration: InputDecoration(
+                          prefixText: 'Rp ',
+                          filled: true,
+                          fillColor: AppTheme.surfaceLighter,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.borderDark)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      Text(t('walletTypeLabel'), style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          _buildTypeRadio('cash', t('typeCash'), type, (val) => setDialogState(() => type = val)),
+                          _buildTypeRadio('bank', t('typeBank'), type, (val) => setDialogState(() => type = val)),
+                          _buildTypeRadio('ewallet', t('typeEWallet'), type, (val) => setDialogState(() => type = val)),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: Text(t('cancel'), style: const TextStyle(color: AppTheme.textMuted)),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final navigator = Navigator.of(dialogContext);
+                    final messenger = ScaffoldMessenger.of(context);
+
+                    if (isTopUp) {
+                      final addAmount = double.tryParse(topUpAmountCtrl.text.replaceAll('.', '')) ?? 0.0;
+                      if (addAmount <= 0) return;
+
+                      final note = topUpNoteCtrl.text.trim().isEmpty
+                          ? (widget.localeService.isIndonesian ? 'Pemasukan ke ${w.name}' : 'Income to ${w.name}')
+                          : topUpNoteCtrl.text.trim();
+
+                      final incomeCategories = widget.storageService.getCategories().where((c) => c.type == 'income').toList();
+                      final incomeCatId = incomeCategories.isNotEmpty
+                          ? (incomeCategories.any((c) => c.id == 'cat_salary')
+                              ? 'cat_salary'
+                              : incomeCategories.first.id)
+                          : 'cat_salary';
+
+                      await widget.storageService.addTransaction(TransactionItem(
+                        id: const Uuid().v4(),
+                        walletId: w.id,
+                        categoryId: incomeCatId,
+                        type: 'income',
+                        amount: addAmount,
+                        note: note,
+                        date: DateTime.now(),
+                      ));
+
+                      if (mounted) {
+                        setState(() {});
+                        widget.onDataChanged();
+                      }
+                      navigator.pop();
+                      messenger.showSnackBar(
+                        SnackBar(
+                          content: Text(t('topUpSuccess')),
+                          backgroundColor: AppTheme.emeraldGreen,
+                        ),
+                      );
+                    } else {
+                      if (nameCtrl.text.trim().isEmpty) return;
+                      final bal = double.tryParse(balanceCtrl.text.replaceAll('.', '')) ?? 0.0;
+
+                      final updatedWallet = Wallet(
+                        id: w.id,
+                        name: nameCtrl.text.trim(),
+                        type: type,
+                        balance: bal,
+                        icon: type == 'bank' ? 'account_balance' : (type == 'ewallet' ? 'phone_android' : 'payments'),
+                        colorValue: type == 'bank' ? 0xFF38BDF8 : (type == 'ewallet' ? 0xFF8B5CF6 : 0xFF10B981),
+                      );
+
+                      await widget.storageService.updateWallet(updatedWallet);
+                      if (mounted) {
+                        setState(() {});
+                        widget.onDataChanged();
+                      }
+                      navigator.pop();
+                      messenger.showSnackBar(
+                        SnackBar(
+                          content: Text(t('updateWalletSuccess')),
+                          backgroundColor: AppTheme.cyanAccent,
+                        ),
+                      );
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isTopUp ? AppTheme.emeraldGreen : AppTheme.cyanAccent,
+                    foregroundColor: Colors.black,
+                  ),
+                  child: Text(
+                    isTopUp ? t('btnTopUp') : t('btnSaveWallet'),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
@@ -1521,6 +1831,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ListTile(
                         dense: true,
                         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                        onTap: () => _showEditWalletDialog(wallets[i]),
                         leading: Container(
                           width: 36,
                           height: 36,
@@ -1545,15 +1856,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              'Rp ${wallets[i].balance.toStringAsFixed(0)}',
+                              'Rp ${ThousandsSeparatorInputFormatter.format(wallets[i].balance)}',
                               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 4),
                             IconButton(
-                              icon: const Icon(Icons.delete_outline, size: 18, color: AppTheme.coralRose),
+                              icon: const Icon(Icons.add_circle_outline, size: 18, color: AppTheme.emeraldGreen),
+                              onPressed: () => _showEditWalletDialog(wallets[i], initialTab: 'topup'),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                              tooltip: t('tabTopUp'),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.edit_outlined, size: 17, color: AppTheme.cyanAccent),
+                              onPressed: () => _showEditWalletDialog(wallets[i], initialTab: 'edit'),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                              tooltip: t('tabEditInfo'),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, size: 17, color: AppTheme.coralRose),
                               onPressed: () => _showDeleteWalletConfirmDialog(wallets[i]),
                               padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
                               tooltip: t('delete'),
                             ),
                           ],

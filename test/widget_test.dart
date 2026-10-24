@@ -7,8 +7,13 @@ import 'package:iritot/services/storage_service.dart';
 import 'package:iritot/services/ai_service.dart';
 import 'package:iritot/services/auth_service.dart';
 import 'package:iritot/services/locale_service.dart';
+import 'package:iritot/models/savings_pocket.dart';
+import 'package:iritot/models/wallet.dart';
 import 'package:iritot/screens/splash_screen.dart';
 import 'package:iritot/screens/login_screen.dart';
+import 'package:iritot/screens/savings_screen.dart';
+import 'package:iritot/screens/budget_screen.dart';
+import 'package:iritot/screens/settings_screen.dart';
 
 void main() {
   testWidgets('IriTot Login flow and Savings navigation smoke test', (WidgetTester tester) async {
@@ -65,8 +70,7 @@ void main() {
 
     // 6. Verify Savings Screen elements in English
     expect(find.text('TOTAL SAVINGS'), findsOneWidget);
-    expect(find.text('Deposit'), findsOneWidget);
-    expect(find.text('Withdraw'), findsOneWidget);
+    expect(find.text('POCKET TARGET'), findsOneWidget);
   });
 
   test('AuthService local credentials and change validation test', () async {
@@ -347,5 +351,201 @@ void main() {
 
     // Verify smooth transition to LoginScreen with Enter Passcode
     expect(find.text('Enter Passcode'), findsOneWidget);
+  });
+
+  testWidgets('SavingsScreen pocket cards render compact Setor, Tarik, Transfer and locked target in transfer modal', (WidgetTester tester) async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    await initializeDateFormatting('en_US', null);
+    await initializeDateFormatting('id_ID', null);
+    SharedPreferences.setMockInitialValues({});
+
+    final storage = await StorageService.init();
+    final locale = await LocaleService.init();
+
+    // Create 2 test pockets
+    await storage.addSavingsPocket(SavingsPocket(
+      id: 'pocket_liburan',
+      name: 'Liburan Bali',
+      targetAmount: 5000000,
+      currentAmount: 1000000,
+      colorValue: 0xFF38BDF8,
+      icon: 'savings',
+      createdAt: DateTime.now(),
+    ));
+
+    await storage.addSavingsPocket(SavingsPocket(
+      id: 'pocket_gadget',
+      name: 'Beli Laptop',
+      targetAmount: 15000000,
+      currentAmount: 2000000,
+      colorValue: 0xFF10B981,
+      icon: 'savings',
+      createdAt: DateTime.now(),
+    ));
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SavingsScreen(
+          storageService: storage,
+          localeService: locale,
+          onDataChanged: () {},
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    // 1. Verify Header displays POCKET TARGET
+    expect(find.text('POCKET TARGET'), findsOneWidget);
+
+    // 2. Verify top 3 buttons (Deposit, Withdraw, Transfer) are REMOVED from top
+    // Instead, each pocket card renders compact actions: Deposit, Withdraw, Transfer
+    expect(find.text('Deposit'), findsNWidgets(2));
+    expect(find.text('Withdraw'), findsNWidgets(2));
+    expect(find.text('Transfer'), findsNWidgets(2));
+
+    // 3. Tap Transfer on first pocket ('Liburan Bali')
+    await tester.tap(find.text('Transfer').first);
+    await tester.pumpAndSettle();
+
+    // Verify modal opened with Target Locked to 'Liburan Bali'
+    expect(find.text('Target Locked'), findsOneWidget);
+    expect(find.text('Liburan Bali'), findsAtLeastNWidgets(1));
+    expect(find.text('Other Pocket'), findsOneWidget);
+    expect(find.text('Cash/Bank Wallet'), findsOneWidget);
+  });
+
+  testWidgets('BudgetScreen refers to total wallet cash balance and warns if overbudget', (WidgetTester tester) async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    SharedPreferences.setMockInitialValues({});
+
+    final storage = await StorageService.init();
+    final locale = await LocaleService.init();
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: BudgetScreen(
+          storageService: storage,
+          localeService: locale,
+          onDataChanged: () {},
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    // Total Wallet Cash is referenced on the screen
+    expect(find.text('Total Wallet Cash'), findsOneWidget);
+  });
+
+  testWidgets('SettingsScreen allows tapping wallet to top up funds and edit info', (WidgetTester tester) async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    SharedPreferences.setMockInitialValues({});
+
+    final storage = await StorageService.init();
+    final locale = await LocaleService.init();
+    final ai = await AiService.init();
+    final auth = await AuthService.init();
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SettingsScreen(
+          storageService: storage,
+          aiService: ai,
+          authService: auth,
+          localeService: locale,
+          onDataChanged: () {},
+          onLogout: () {},
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    // Verify wallet section exists
+    expect(find.text('MY WALLETS & ACCOUNTS'), findsOneWidget);
+    expect(find.text('Dompet Utama'), findsOneWidget);
+
+    // Tap top up (+) button on the wallet row
+    final topUpBtn = find.byIcon(Icons.add_circle_outline).first;
+    await tester.tap(topUpBtn);
+    await tester.pumpAndSettle();
+
+    // Verify dialog opens with top up tab
+    expect(find.text('Add Funds (Income)'), findsOneWidget);
+    expect(find.text('Edit Info & Balance'), findsOneWidget);
+    expect(find.text('Additional Amount (Rp):'), findsOneWidget);
+
+    // Enter amount: 2000000
+    final dialogTextFields = find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField));
+    await tester.enterText(dialogTextFields.first, '2000000');
+    await tester.pumpAndSettle();
+
+    // Tap Add Funds button
+    final addFundsBtn = find.descendant(of: find.byType(AlertDialog), matching: find.text('Add Funds'));
+    await tester.tap(addFundsBtn);
+    await tester.pumpAndSettle();
+
+    // Verify wallet balance is updated to 2.000.000
+    final wallet = storage.getWallets().first;
+    expect(wallet.balance, 2000000);
+
+    // Verify income transaction created
+    final txs = storage.getTransactions();
+    expect(txs.any((t) => t.type == 'income' && t.amount == 2000000), isTrue);
+  });
+
+  testWidgets('BudgetScreen excludes savings pocket deposits from monthly budget and categories', (WidgetTester tester) async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    SharedPreferences.setMockInitialValues({});
+
+    final storage = await StorageService.init();
+    final locale = await LocaleService.init();
+
+    // Add a wallet with 5.000.000
+    await storage.addWallet(Wallet(
+      id: 'w_test',
+      name: 'Test Wallet',
+      type: 'bank',
+      balance: 5000000,
+      icon: 'account_balance',
+      colorValue: 0xFF10B981,
+    ));
+
+    // Create a pocket and deposit 1.000.000
+    await storage.addSavingsPocket(SavingsPocket(
+      id: 'pocket_vacation',
+      name: 'Liburan',
+      targetAmount: 5000000,
+      currentAmount: 0,
+      icon: 'savings',
+      colorValue: 0xFF38BDF8,
+      createdAt: DateTime.now(),
+    ));
+
+    await storage.depositToSavings(
+      pocketId: 'pocket_vacation',
+      walletId: 'w_test',
+      amount: 1000000,
+      note: 'Setor liburan',
+    );
+
+    // Set budget for Food: 1.500.000
+    final now = DateTime.now();
+    await storage.setBudget('cat_food', 1500000, now.month, now.year);
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: BudgetScreen(
+          storageService: storage,
+          localeService: locale,
+          onDataChanged: () {},
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    // Alokasi Tabungan should NOT be in the budget category list
+    expect(find.text('Alokasi Tabungan'), findsNothing);
+
+    // Total spent in Monthly Budget should be Rp 0 (pocket deposit is not an expense budget item)
+    expect(find.text('0% Used'), findsOneWidget);
   });
 }

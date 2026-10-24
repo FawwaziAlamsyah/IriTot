@@ -10,6 +10,7 @@ import '../services/locale_service.dart';
 import '../services/speech_service.dart';
 import '../widgets/voice_wave.dart';
 import '../theme/app_theme.dart';
+import '../widgets/currency_input_formatter.dart';
 
 class AddTransactionModal extends StatefulWidget {
   final StorageService storageService;
@@ -75,7 +76,7 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
         : (_categories.isNotEmpty ? _categories.first.id : 'cat_food');
 
     if (widget.initialAmount != null && widget.initialAmount! > 0) {
-      _amountController.text = widget.initialAmount!.toStringAsFixed(0);
+      _amountController.text = ThousandsSeparatorInputFormatter.format(widget.initialAmount!);
     }
     if (widget.initialNote != null && widget.initialNote!.isNotEmpty) {
       _noteController.text = widget.initialNote!;
@@ -162,7 +163,7 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
       _type = parsed['type'] as String;
       final amount = parsed['amount'] as double;
       if (amount > 0) {
-        _amountController.text = amount.toStringAsFixed(0);
+        _amountController.text = ThousandsSeparatorInputFormatter.format(amount);
       }
       _selectedCategoryId = parsed['categoryId'] as String;
       _selectedWalletId = parsed['walletId'] as String;
@@ -246,7 +247,7 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
         _isScanningReceipt = false;
         final amount = result['amount'] as double? ?? 0.0;
         if (amount > 0) {
-          _amountController.text = amount.toStringAsFixed(0);
+          _amountController.text = ThousandsSeparatorInputFormatter.format(amount);
         }
         final note = result['note'] as String? ?? '';
         if (note.isNotEmpty) {
@@ -281,13 +282,13 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
   }
 
   void _addQuickAmount(double amount) {
-    final current = double.tryParse(_amountController.text.replaceAll('.', '')) ?? 0.0;
+    final current = ThousandsSeparatorInputFormatter.parse(_amountController.text);
     final updated = current + amount;
-    _amountController.text = updated.toStringAsFixed(0);
+    _amountController.text = ThousandsSeparatorInputFormatter.format(updated);
   }
 
   void _saveTransaction() async {
-    final amount = double.tryParse(_amountController.text.replaceAll('.', '')) ?? 0.0;
+    final amount = ThousandsSeparatorInputFormatter.parse(_amountController.text);
     if (amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -508,6 +509,7 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
             TextField(
               controller: _amountController,
               keyboardType: TextInputType.number,
+              inputFormatters: [ThousandsSeparatorInputFormatter()],
               style: TextStyle(
                 fontSize: 26,
                 fontWeight: FontWeight.w800,

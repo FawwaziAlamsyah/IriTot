@@ -8,6 +8,7 @@ import '../services/storage_service.dart';
 import '../services/csv_service.dart';
 import '../services/file_io_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/currency_input_formatter.dart';
 
 import '../services/locale_service.dart';
 
@@ -132,6 +133,10 @@ class _SavingsScreenState extends State<SavingsScreen> {
               (w) => w.id == selectedWalletId,
               orElse: () => wallets.first,
             );
+            final targetPocket = pockets.firstWhere(
+              (p) => p.id == selectedPocketId,
+              orElse: () => pockets.first,
+            );
 
             return Container(
               decoration: const BoxDecoration(
@@ -174,42 +179,104 @@ class _SavingsScreenState extends State<SavingsScreen> {
                     const SizedBox(height: 16),
 
                     // Pilih Kantong Tujuan
-                    Text(t('targetPocketLabel'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+                    Text(
+                      preselectedPocket != null ? t('lockedTargetPocket') : t('targetPocketLabel'),
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                    ),
                     const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      decoration: BoxDecoration(
-                        color: AppTheme.surfaceLighter,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: AppTheme.borderDark),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: selectedPocketId,
-                          isExpanded: true,
-                          dropdownColor: AppTheme.surfaceDark,
-                          items: pockets.map((p) {
-                            return DropdownMenuItem(
-                              value: p.id,
-                              child: Row(
+                    if (preselectedPocket != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: AppTheme.surfaceLighter,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppTheme.borderDark),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 12,
+                              height: 12,
+                              decoration: BoxDecoration(color: Color(targetPocket.colorValue), shape: BoxShape.circle),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Container(
-                                    width: 10,
-                                    height: 10,
-                                    decoration: BoxDecoration(color: Color(p.colorValue), shape: BoxShape.circle),
+                                  Row(
+                                    children: [
+                                      Text(
+                                        targetPocket.name,
+                                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.emeraldGreen.withValues(alpha: 0.15),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.lock_outline, size: 10, color: AppTheme.emeraldGreen),
+                                            const SizedBox(width: 3),
+                                            Text(
+                                              widget.localeService?.isIndonesian == true ? 'Target Terkunci' : 'Target Locked',
+                                              style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: AppTheme.emeraldGreen),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(width: 8),
-                                  Text(p.name, style: const TextStyle(fontSize: 13, color: AppTheme.textPrimary)),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    '${widget.localeService?.isIndonesian == true ? 'Saldo saat ini' : 'Current balance'}: ${_currencyFormat.format(targetPocket.currentAmount)}${targetPocket.targetAmount > 0 ? ' • Target: ${_currencyFormat.format(targetPocket.targetAmount)}' : ''}',
+                                    style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                                  ),
                                 ],
                               ),
-                            );
-                          }).toList(),
-                          onChanged: (val) {
-                            if (val != null) setModalState(() => selectedPocketId = val);
-                          },
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        decoration: BoxDecoration(
+                          color: AppTheme.surfaceLighter,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppTheme.borderDark),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: selectedPocketId,
+                            isExpanded: true,
+                            dropdownColor: AppTheme.surfaceDark,
+                            items: pockets.map((p) {
+                              return DropdownMenuItem(
+                                value: p.id,
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 10,
+                                      height: 10,
+                                      decoration: BoxDecoration(color: Color(p.colorValue), shape: BoxShape.circle),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(p.name, style: const TextStyle(fontSize: 13, color: AppTheme.textPrimary)),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              if (val != null) setModalState(() => selectedPocketId = val);
+                            },
+                          ),
                         ),
                       ),
-                    ),
                     const SizedBox(height: 14),
 
                     // Pilih Sumber Dompet
@@ -256,6 +323,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
                     TextField(
                       controller: amountCtrl,
                       keyboardType: TextInputType.number,
+                      inputFormatters: [ThousandsSeparatorInputFormatter()],
                       style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppTheme.emeraldGreen),
                       decoration: InputDecoration(
                         prefixText: 'Rp ',
@@ -284,8 +352,8 @@ class _SavingsScreenState extends State<SavingsScreen> {
                               side: const BorderSide(color: AppTheme.borderDark),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               onPressed: () {
-                                final cur = double.tryParse(amountCtrl.text.replaceAll('.', '')) ?? 0.0;
-                                amountCtrl.text = (cur + amt).toStringAsFixed(0);
+                                final cur = ThousandsSeparatorInputFormatter.parse(amountCtrl.text);
+                                amountCtrl.text = ThousandsSeparatorInputFormatter.format(cur + amt);
                               },
                             ),
                           );
@@ -442,7 +510,12 @@ class _SavingsScreenState extends State<SavingsScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(t('sourcePocketLabel'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+                        Text(
+                          preselectedPocket != null
+                              ? (widget.localeService?.isIndonesian == true ? 'Pos Asal (Terkunci):' : 'Source Pocket (Locked):')
+                              : t('sourcePocketLabel'),
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                        ),
                         Text(
                           '${t('available')}: ${_currencyFormat.format(activePocket.currentAmount)}',
                           style: const TextStyle(fontSize: 11, color: AppTheme.emeraldGreen, fontWeight: FontWeight.w600),
@@ -450,30 +523,74 @@ class _SavingsScreenState extends State<SavingsScreen> {
                       ],
                     ),
                     const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      decoration: BoxDecoration(
-                        color: AppTheme.surfaceLighter,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: AppTheme.borderDark),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: selectedPocketId,
-                          isExpanded: true,
-                          dropdownColor: AppTheme.surfaceDark,
-                          items: pockets.map((p) {
-                            return DropdownMenuItem(
-                              value: p.id,
-                              child: Text(p.name, style: const TextStyle(fontSize: 13, color: AppTheme.textPrimary)),
-                            );
-                          }).toList(),
-                          onChanged: (val) {
-                            if (val != null) setModalState(() => selectedPocketId = val);
-                          },
+                    if (preselectedPocket != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: AppTheme.surfaceLighter,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppTheme.borderDark),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 12,
+                              height: 12,
+                              decoration: BoxDecoration(color: Color(activePocket.colorValue), shape: BoxShape.circle),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                activePocket.name,
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppTheme.coralRose.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.lock_outline, size: 10, color: AppTheme.coralRose),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    widget.localeService?.isIndonesian == true ? 'Pos Terkunci' : 'Pocket Locked',
+                                    style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: AppTheme.coralRose),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        decoration: BoxDecoration(
+                          color: AppTheme.surfaceLighter,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppTheme.borderDark),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: selectedPocketId,
+                            isExpanded: true,
+                            dropdownColor: AppTheme.surfaceDark,
+                            items: pockets.map((p) {
+                              return DropdownMenuItem(
+                                value: p.id,
+                                child: Text(p.name, style: const TextStyle(fontSize: 13, color: AppTheme.textPrimary)),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              if (val != null) setModalState(() => selectedPocketId = val);
+                            },
+                          ),
                         ),
                       ),
-                    ),
                     const SizedBox(height: 14),
 
                     // Pilih Dompet Penerima
@@ -511,6 +628,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
                     TextField(
                       controller: amountCtrl,
                       keyboardType: TextInputType.number,
+                      inputFormatters: [ThousandsSeparatorInputFormatter()],
                       style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppTheme.coralRose),
                       decoration: InputDecoration(
                         prefixText: 'Rp ',
@@ -519,6 +637,50 @@ class _SavingsScreenState extends State<SavingsScreen> {
                         fillColor: AppTheme.surfaceLighter,
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppTheme.borderDark)),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Quick Chips
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          ...[100000, 250000, 500000, 1000000].map((amt) {
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: ActionChip(
+                                label: Text(
+                                  '+${(amt / 1000).toInt()}k',
+                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                                ),
+                                backgroundColor: AppTheme.surfaceLighter,
+                                side: const BorderSide(color: AppTheme.borderDark),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                onPressed: () {
+                                  final cur = ThousandsSeparatorInputFormatter.parse(amountCtrl.text);
+                                  final next = (cur + amt).clamp(0.0, activePocket.currentAmount);
+                                  amountCtrl.text = ThousandsSeparatorInputFormatter.format(next);
+                                },
+                              ),
+                            );
+                          }),
+                          Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: ActionChip(
+                              label: Text(
+                                widget.localeService?.isIndonesian == true ? 'Tarik Semua' : 'Withdraw All',
+                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.coralRose),
+                              ),
+                              backgroundColor: AppTheme.coralRose.withValues(alpha: 0.1),
+                              side: BorderSide(color: AppTheme.coralRose.withValues(alpha: 0.3)),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              onPressed: () {
+                                amountCtrl.text = ThousandsSeparatorInputFormatter.format(activePocket.currentAmount);
+                              },
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 14),
@@ -602,6 +764,661 @@ class _SavingsScreenState extends State<SavingsScreen> {
     );
   }
 
+  // Modal Transfer Dana Antar Pos / dari Dompet ke Pos Tabungan Tertentu
+  void _showTransferBetweenPocketsModal({SavingsPocket? preselectedPocket}) {
+    final pockets = widget.storageService.getSavingsPockets();
+    final wallets = widget.storageService.getWallets();
+
+    if (pockets.isEmpty) {
+      _showCreatePocketDialog();
+      return;
+    }
+
+    final targetPocket = preselectedPocket ?? pockets.first;
+    final otherPockets = pockets.where((p) => p.id != targetPocket.id).toList();
+
+    // Default source type: if other pockets exist, use 'pocket', otherwise 'wallet'
+    String sourceType = otherPockets.isNotEmpty ? 'pocket' : 'wallet';
+    String selectedSourcePocketId = otherPockets.isNotEmpty ? otherPockets.first.id : '';
+    String selectedSourceWalletId = wallets.isNotEmpty ? wallets.first.id : '';
+
+    final amountCtrl = TextEditingController();
+    final noteCtrl = TextEditingController(
+      text: widget.localeService?.isIndonesian == true
+          ? 'Transfer dana ke ${targetPocket.name}'
+          : 'Transfer funds to ${targetPocket.name}',
+    );
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (modalCtx, setModalState) {
+            final activeSourcePocket = otherPockets.firstWhere(
+              (p) => p.id == selectedSourcePocketId,
+              orElse: () => otherPockets.isNotEmpty ? otherPockets.first : targetPocket,
+            );
+            final activeSourceWallet = wallets.firstWhere(
+              (w) => w.id == selectedSourceWalletId,
+              orElse: () => wallets.first,
+            );
+
+            final double availableSourceBalance = sourceType == 'pocket'
+                ? activeSourcePocket.currentAmount
+                : activeSourceWallet.balance;
+            final String sourceName = sourceType == 'pocket'
+                ? activeSourcePocket.name
+                : activeSourceWallet.name;
+
+            final enteredAmount = ThousandsSeparatorInputFormatter.parse(amountCtrl.text);
+            final isOverBalance = enteredAmount > availableSourceBalance;
+
+            return Container(
+              decoration: const BoxDecoration(
+                color: AppTheme.surfaceDark,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+                border: Border(top: BorderSide(color: AppTheme.borderDark, width: 1)),
+              ),
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 16,
+                bottom: MediaQuery.of(modalCtx).viewInsets.bottom + 24,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: AppTheme.textMuted.withValues(alpha: 0.4),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        const Icon(Icons.swap_horiz_rounded, color: AppTheme.cyanAccent, size: 24),
+                        const SizedBox(width: 8),
+                        Text(
+                          widget.localeService?.isIndonesian == true ? 'Transfer Dana ke Pos' : 'Transfer Funds to Pocket',
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.textPrimary),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Pos Tujuan (TARGET) - TERKUNCI KE KATEGORI A
+                    Text(
+                      t('lockedTargetPocket'),
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surfaceLighter,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppTheme.borderDark),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 12,
+                                height: 12,
+                                decoration: BoxDecoration(color: Color(targetPocket.colorValue), shape: BoxShape.circle),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  targetPocket.name,
+                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.cyanAccent.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.lock_outline, size: 10, color: AppTheme.cyanAccent),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      widget.localeService?.isIndonesian == true ? 'Target Terkunci' : 'Target Locked',
+                                      style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: AppTheme.cyanAccent),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                '${widget.localeService?.isIndonesian == true ? 'Saldo saat ini' : 'Current balance'}: ${_currencyFormat.format(targetPocket.currentAmount)}',
+                                style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                              ),
+                              if (targetPocket.targetAmount > 0)
+                                Text(
+                                  'Target: ${_currencyFormat.format(targetPocket.targetAmount)}',
+                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Sumber Dana (FROM) - BISA DIUBAH (Antar Pos atau Dompet)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          t('sourceFundsLabel'),
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                        ),
+                        Text(
+                          '${t('available')}: ${_currencyFormat.format(availableSourceBalance)}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: availableSourceBalance > 0 ? AppTheme.cyanAccent : AppTheme.coralRose,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Toggle Sumber: Pos Lain vs Dompet
+                    Row(
+                      children: [
+                        if (otherPockets.isNotEmpty) ...[
+                          Expanded(
+                            child: InkWell(
+                              onTap: () => setModalState(() => sourceType = 'pocket'),
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: sourceType == 'pocket' ? AppTheme.cyanAccent.withValues(alpha: 0.15) : AppTheme.surfaceLighter,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: sourceType == 'pocket' ? AppTheme.cyanAccent : AppTheme.borderDark,
+                                  ),
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  widget.localeService?.isIndonesian == true ? 'Pos Kantong Lain' : 'Other Pocket',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: sourceType == 'pocket' ? AppTheme.cyanAccent : AppTheme.textMuted,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                        if (wallets.isNotEmpty)
+                          Expanded(
+                            child: InkWell(
+                              onTap: () => setModalState(() => sourceType = 'wallet'),
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: sourceType == 'wallet' ? AppTheme.emeraldGreen.withValues(alpha: 0.15) : AppTheme.surfaceLighter,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: sourceType == 'wallet' ? AppTheme.emeraldGreen : AppTheme.borderDark,
+                                  ),
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  widget.localeService?.isIndonesian == true ? 'Dompet Kas/Bank' : 'Cash/Bank Wallet',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: sourceType == 'wallet' ? AppTheme.emeraldGreen : AppTheme.textMuted,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Dropdown pilihan sumber
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surfaceLighter,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppTheme.borderDark),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: sourceType == 'pocket'
+                            ? DropdownButton<String>(
+                                value: selectedSourcePocketId.isNotEmpty ? selectedSourcePocketId : (otherPockets.isNotEmpty ? otherPockets.first.id : null),
+                                isExpanded: true,
+                                dropdownColor: AppTheme.surfaceDark,
+                                items: otherPockets.map((p) {
+                                  return DropdownMenuItem(
+                                    value: p.id,
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 10,
+                                          height: 10,
+                                          decoration: BoxDecoration(color: Color(p.colorValue), shape: BoxShape.circle),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(p.name, style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13, fontWeight: FontWeight.w600)),
+                                        const Spacer(),
+                                        Text(_currencyFormat.format(p.currentAmount), style: const TextStyle(color: AppTheme.textMuted, fontSize: 11)),
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
+                                onChanged: (val) {
+                                  if (val != null) setModalState(() => selectedSourcePocketId = val);
+                                },
+                              )
+                            : DropdownButton<String>(
+                                value: selectedSourceWalletId.isNotEmpty ? selectedSourceWalletId : (wallets.isNotEmpty ? wallets.first.id : null),
+                                isExpanded: true,
+                                dropdownColor: AppTheme.surfaceDark,
+                                items: wallets.map((w) {
+                                  return DropdownMenuItem(
+                                    value: w.id,
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.account_balance_wallet_outlined, size: 14, color: AppTheme.emeraldGreen),
+                                        const SizedBox(width: 8),
+                                        Text(w.name, style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13, fontWeight: FontWeight.w600)),
+                                        const Spacer(),
+                                        Text(_currencyFormat.format(w.balance), style: const TextStyle(color: AppTheme.textMuted, fontSize: 11)),
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
+                                onChanged: (val) {
+                                  if (val != null) setModalState(() => selectedSourceWalletId = val);
+                                },
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Nominal Input
+                    Text(t('nominal'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: amountCtrl,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [ThousandsSeparatorInputFormatter()],
+                      onChanged: (_) => setModalState(() {}),
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: isOverBalance ? AppTheme.coralRose : AppTheme.cyanAccent,
+                      ),
+                      decoration: InputDecoration(
+                        prefixText: 'Rp ',
+                        prefixStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.textMuted),
+                        filled: true,
+                        fillColor: AppTheme.surfaceLighter,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppTheme.borderDark)),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide(color: isOverBalance ? AppTheme.coralRose : AppTheme.cyanAccent, width: 1.5),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
+                    ),
+                    if (isOverBalance) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          const Icon(Icons.warning_amber_rounded, size: 14, color: AppTheme.coralRose),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              '${widget.localeService?.isIndonesian == true ? 'Melebihi saldo sumber tersedia (Maks:' : 'Exceeds available source balance (Max:'} ${_currencyFormat.format(availableSourceBalance)})',
+                              style: const TextStyle(fontSize: 11, color: AppTheme.coralRose, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+
+                    // Quick Chips
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          if (availableSourceBalance > 0)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: ActionChip(
+                                label: Text(
+                                  widget.localeService?.isIndonesian == true ? 'Semua Saldo' : 'All Balance',
+                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.cyanAccent),
+                                ),
+                                backgroundColor: AppTheme.cyanAccent.withValues(alpha: 0.12),
+                                side: BorderSide(color: AppTheme.cyanAccent.withValues(alpha: 0.4)),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                onPressed: () {
+                                  setModalState(() {
+                                    amountCtrl.text = ThousandsSeparatorInputFormatter.format(availableSourceBalance);
+                                  });
+                                },
+                              ),
+                            ),
+                          ...[50000, 100000, 250000, 500000, 1000000].map((amt) {
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: ActionChip(
+                                label: Text(
+                                  '+${(amt / 1000).toInt()}k',
+                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                                ),
+                                backgroundColor: AppTheme.surfaceLighter,
+                                side: const BorderSide(color: AppTheme.borderDark),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                onPressed: () {
+                                  final cur = ThousandsSeparatorInputFormatter.parse(amountCtrl.text);
+                                  final next = (cur + amt).clamp(0.0, availableSourceBalance);
+                                  setModalState(() {
+                                    amountCtrl.text = ThousandsSeparatorInputFormatter.format(next);
+                                  });
+                                },
+                              ),
+                            );
+                          }),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Catatan
+                    Text(t('noteOptional'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: noteCtrl,
+                      maxLength: 500,
+                      minLines: 1,
+                      maxLines: 4,
+                      keyboardType: TextInputType.multiline,
+                      style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
+                      decoration: InputDecoration(
+                        hintText: widget.localeService?.isIndonesian == true ? 'Contoh: Alokasi dana untuk pos tabungan' : 'e.g. Savings allocation',
+                        filled: true,
+                        fillColor: AppTheme.surfaceLighter,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppTheme.borderDark)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Submit Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          final amount = ThousandsSeparatorInputFormatter.parse(amountCtrl.text);
+                          if (amount <= 0) return;
+
+                          if (amount > availableSourceBalance) {
+                            ScaffoldMessenger.of(modalCtx).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  widget.localeService?.isIndonesian == true
+                                      ? 'Saldo sumber tidak mencukupi.'
+                                      : 'Insufficient source balance.',
+                                ),
+                                backgroundColor: AppTheme.coralRose,
+                              ),
+                            );
+                            return;
+                          }
+
+                          final navigator = Navigator.of(modalCtx);
+                          final messenger = ScaffoldMessenger.of(context);
+
+                          if (sourceType == 'pocket') {
+                            await widget.storageService.transferBetweenPockets(
+                              sourcePocketId: selectedSourcePocketId,
+                              targetPocketId: targetPocket.id,
+                              amount: amount,
+                              note: noteCtrl.text.trim().isEmpty ? null : noteCtrl.text.trim(),
+                            );
+                          } else {
+                            await widget.storageService.depositToSavings(
+                              pocketId: targetPocket.id,
+                              walletId: selectedSourceWalletId,
+                              amount: amount,
+                              note: noteCtrl.text.trim().isEmpty
+                                  ? 'Transfer dari $sourceName'
+                                  : noteCtrl.text.trim(),
+                            );
+                          }
+
+                          if (mounted) {
+                            setState(() {});
+                            widget.onDataChanged();
+                          }
+                          navigator.pop();
+
+                          messenger.showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                widget.localeService?.isIndonesian == true
+                                    ? 'Berhasil mentransfer ${_currencyFormat.format(amount)} ke ${targetPocket.name}!'
+                                    : 'Transferred ${_currencyFormat.format(amount)} to ${targetPocket.name}!',
+                              ),
+                              backgroundColor: AppTheme.cyanAccent,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.cyanAccent,
+                          foregroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        child: Text(
+                          '${widget.localeService?.isIndonesian == true ? 'Pindahkan Dana ke' : 'Transfer Funds to'} ${targetPocket.name}',
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showRecordDetailModal(SavingsRecord r) {
+    final isIndo = widget.localeService?.isIndonesian == true;
+    final isTransfer = r.isPocketTransfer;
+    final isIn = r.isIn;
+    final Color accentColor = isTransfer
+        ? AppTheme.cyanAccent
+        : (isIn ? AppTheme.emeraldGreen : AppTheme.coralRose);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: AppTheme.surfaceDark,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            border: Border(top: BorderSide(color: AppTheme.borderDark, width: 1)),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppTheme.textMuted.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    isIndo ? 'Detail Mutasi Tabungan' : 'Pocket Transaction Details',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: accentColor.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      isTransfer
+                          ? (isIndo ? 'Antar Pos' : 'Pocket Transfer')
+                          : (isIn ? (isIndo ? 'Setoran Dompet' : 'Wallet Deposit') : (isIndo ? 'Tarik Dompet' : 'Wallet Withdraw')),
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: accentColor),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              // Nominal Banner
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceLighter,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppTheme.borderDark),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isIndo ? 'Nominal Transaksi' : 'Transaction Amount',
+                      style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      isIn ? '+${_currencyFormat.format(r.amount)}' : '-${_currencyFormat.format(r.amount)}',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        color: accentColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              _buildDetailRow(
+                isIndo ? 'Pos Kantong Tabungan' : 'Savings Pocket',
+                r.pocketName,
+                Icons.savings_outlined,
+              ),
+              const SizedBox(height: 10),
+              _buildDetailRow(
+                isTransfer
+                    ? (isIndo ? 'Pos Lawan (Tujuan/Asal)' : 'Counter Pocket')
+                    : (isIn ? (isIndo ? 'Dari Dompet Kas' : 'From Wallet') : (isIndo ? 'Pindah ke Dompet' : 'To Wallet')),
+                r.walletName,
+                isTransfer ? Icons.swap_horiz_rounded : Icons.account_balance_wallet_outlined,
+              ),
+              const SizedBox(height: 10),
+              _buildDetailRow(
+                isIndo ? 'Waktu Transaksi' : 'Date & Time',
+                DateFormat('EEEE, dd MMMM yyyy - HH:mm', isIndo ? 'id_ID' : 'en_US').format(r.date),
+                Icons.calendar_today_outlined,
+              ),
+              const SizedBox(height: 10),
+              _buildDetailRow(
+                isIndo ? 'Catatan' : 'Notes',
+                r.note.isEmpty ? '-' : r.note,
+                Icons.notes_outlined,
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.surfaceLighter,
+                    foregroundColor: AppTheme.textPrimary,
+                    side: const BorderSide(color: AppTheme.borderDark),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: Text(t('close'), style: const TextStyle(fontWeight: FontWeight.w700)),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value, IconData icon) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 16, color: AppTheme.textMuted),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   // Dialog Buat Kantong Tabungan Baru
   void _showCreatePocketDialog() {
     final nameCtrl = TextEditingController();
@@ -657,6 +1474,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
                     TextField(
                       controller: targetCtrl,
                       keyboardType: TextInputType.number,
+                      inputFormatters: [ThousandsSeparatorInputFormatter()],
                       style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14, fontWeight: FontWeight.w700),
                       decoration: InputDecoration(
                         prefixText: 'Rp ',
@@ -923,47 +1741,12 @@ class _SavingsScreenState extends State<SavingsScreen> {
               ),
               const SizedBox(height: 18),
 
-              // Aksi Tabungan
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () => _showDepositModal(),
-                      icon: const Icon(Icons.add_circle_outline, size: 18),
-                      label: Text(widget.localeService?.t('deposit') ?? 'Deposit'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.emeraldGreen,
-                        foregroundColor: Colors.black,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () => _showWithdrawModal(),
-                      icon: const Icon(Icons.remove_circle_outline, size: 18),
-                      label: Text(widget.localeService?.t('withdraw') ?? 'Withdraw'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.surfaceLighter,
-                        foregroundColor: AppTheme.coralRose,
-                        side: const BorderSide(color: AppTheme.borderDark),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-
               // Seksi Kantong Tabungan (Pockets / Goals)
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    widget.localeService?.t('secSavingsTargets') ?? 'SAVINGS TARGETS',
+                    widget.localeService?.t('secSavingsTargets') ?? 'POCKET TARGET',
                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.5, color: AppTheme.textSecondary),
                   ),
                   TextButton.icon(
@@ -1114,45 +1897,103 @@ class _SavingsScreenState extends State<SavingsScreen> {
                           ],
                           const SizedBox(height: 12),
 
-                          // Tombol Aksi Cepat per Kantong
+                          // Tombol Aksi per Kantong (UI Simpel & Kompak)
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              IconButton(
-                                icon: const Icon(Icons.delete_outline, size: 18, color: AppTheme.coralRose),
-                                tooltip: t('deletePocketBtn'),
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
-                                onPressed: () => _confirmDeletePocket(p),
+                              // Setor (+ Nabung)
+                              Expanded(
+                                child: InkWell(
+                                  onTap: () => _showDepositModal(preselectedPocket: p),
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.emeraldGreen.withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: AppTheme.emeraldGreen.withValues(alpha: 0.3)),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        const Icon(Icons.add_circle_outline, size: 14, color: AppTheme.emeraldGreen),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          widget.localeService?.isIndonesian == true ? 'Setor' : 'Deposit',
+                                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.emeraldGreen),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
                               ),
-                              Row(
-                                children: [
-                                  OutlinedButton.icon(
-                                    onPressed: () => _showWithdrawModal(preselectedPocket: p),
-                                    icon: const Icon(Icons.remove, size: 14),
-                                    label: Text(t('withdraw'), style: const TextStyle(fontSize: 11)),
-                                    style: OutlinedButton.styleFrom(
-                                      foregroundColor: AppTheme.coralRose,
-                                      side: const BorderSide(color: AppTheme.borderDark),
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                      minimumSize: Size.zero,
-                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              const SizedBox(width: 6),
+                              // Tarik
+                              Expanded(
+                                child: InkWell(
+                                  onTap: () => _showWithdrawModal(preselectedPocket: p),
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.coralRose.withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: AppTheme.coralRose.withValues(alpha: 0.3)),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        const Icon(Icons.remove_circle_outline, size: 14, color: AppTheme.coralRose),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          widget.localeService?.isIndonesian == true ? 'Tarik' : 'Withdraw',
+                                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.coralRose),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
-                                  ElevatedButton.icon(
-                                    onPressed: () => _showDepositModal(preselectedPocket: p),
-                                    icon: const Icon(Icons.add, size: 14),
-                                    label: Text(t('deposit'), style: const TextStyle(fontSize: 11)),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: color,
-                                      foregroundColor: Colors.black,
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                      minimumSize: Size.zero,
-                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              // Transfer (Pindah)
+                              Expanded(
+                                child: InkWell(
+                                  onTap: () => _showTransferBetweenPocketsModal(preselectedPocket: p),
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.cyanAccent.withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: AppTheme.cyanAccent.withValues(alpha: 0.3)),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        const Icon(Icons.swap_horiz_rounded, size: 14, color: AppTheme.cyanAccent),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          widget.localeService?.isIndonesian == true ? 'Transfer' : 'Transfer',
+                                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.cyanAccent),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                ],
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              // Hapus
+                              InkWell(
+                                onTap: () => _confirmDeletePocket(p),
+                                borderRadius: BorderRadius.circular(10),
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.surfaceLighter,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: AppTheme.borderDark),
+                                  ),
+                                  child: const Icon(Icons.delete_outline, size: 16, color: AppTheme.coralRose),
+                                ),
                               ),
                             ],
                           ),
@@ -1224,66 +2065,118 @@ class _SavingsScreenState extends State<SavingsScreen> {
                   itemBuilder: (context, index) {
                     final r = filteredRecords[index];
                     final isIn = r.isIn;
+                    final isTransfer = r.isPocketTransfer;
+                    final Color accentColor = isTransfer
+                        ? AppTheme.cyanAccent
+                        : (isIn ? AppTheme.emeraldGreen : AppTheme.coralRose);
+                    final IconData iconData = isTransfer
+                        ? Icons.swap_horiz_rounded
+                        : (isIn ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded);
+                    final String badgeText = isTransfer
+                        ? (widget.localeService?.t('badgePocketTransfer') ?? 'Antar Pos')
+                        : (isIn
+                            ? (widget.localeService?.t('badgeWalletDeposit') ?? 'Setoran Dompet')
+                            : (widget.localeService?.t('badgeWalletWithdraw') ?? 'Tarik Dompet'));
+                    final String subtitleText = isTransfer
+                        ? '${r.pocketName} ⇄ ${r.walletName} • ${DateFormat('dd MMM yyyy', widget.localeService?.isIndonesian == true ? 'id_ID' : 'en_US').format(r.date)}'
+                        : '${r.pocketName} • ${isIn ? (widget.localeService?.isIndonesian == true ? 'Dari' : 'From') : (widget.localeService?.isIndonesian == true ? 'Ke' : 'To')}: ${r.walletName} • ${DateFormat('dd MMM yyyy', widget.localeService?.isIndonesian == true ? 'id_ID' : 'en_US').format(r.date)}';
 
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: AppTheme.surfaceDark,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: AppTheme.borderDark),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Row(
+                    return InkWell(
+                      onTap: () => _showRecordDetailModal(r),
+                      borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: AppTheme.surfaceDark,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: isTransfer
+                                ? AppTheme.cyanAccent.withValues(alpha: 0.25)
+                                : AppTheme.borderDark,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 36,
+                                    height: 36,
+                                    decoration: BoxDecoration(
+                                      color: accentColor.withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Icon(
+                                      iconData,
+                                      color: accentColor,
+                                      size: 18,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: accentColor.withValues(alpha: 0.15),
+                                                borderRadius: BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                badgeText,
+                                                style: TextStyle(
+                                                  fontSize: 9,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: accentColor,
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Expanded(
+                                              child: Text(
+                                                r.note,
+                                                maxLines: 1,
+                                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 3),
+                                        Text(
+                                          subtitleText,
+                                          style: const TextStyle(fontSize: 10, color: AppTheme.textMuted),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                Container(
-                                  width: 34,
-                                  height: 34,
-                                  decoration: BoxDecoration(
-                                    color: isIn ? AppTheme.emeraldGreen.withValues(alpha: 0.15) : AppTheme.coralRose.withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Icon(
-                                    isIn ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
-                                    color: isIn ? AppTheme.emeraldGreen : AppTheme.coralRose,
-                                    size: 16,
+                                Text(
+                                  isIn ? '+${_currencyFormat.format(r.amount)}' : '-${_currencyFormat.format(r.amount)}',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: isIn ? (isTransfer ? AppTheme.cyanAccent : AppTheme.emeraldGreen) : AppTheme.coralRose,
                                   ),
                                 ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        r.note,
-                                        maxLines: 2,
-                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        '${r.pocketName} • ${r.walletName} • ${DateFormat('dd MMM yyyy', widget.localeService?.isIndonesian == true ? 'id_ID' : 'en_US').format(r.date)}',
-                                        style: const TextStyle(fontSize: 10, color: AppTheme.textMuted),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                                const SizedBox(width: 4),
+                                const Icon(Icons.chevron_right, size: 14, color: AppTheme.textMuted),
                               ],
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            isIn ? '+${_currencyFormat.format(r.amount)}' : '-${_currencyFormat.format(r.amount)}',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: isIn ? AppTheme.emeraldGreen : AppTheme.coralRose,
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     );
                   },

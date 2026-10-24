@@ -8,6 +8,7 @@ class SavingsRecord {
   final double amount;
   final String note;
   final DateTime date;
+  final String transferType; // 'wallet' (deposit/withdraw dari dompet) atau 'pocket_transfer' (pindah antar pos)
 
   SavingsRecord({
     required this.id,
@@ -19,10 +20,12 @@ class SavingsRecord {
     required this.amount,
     required this.note,
     required this.date,
+    this.transferType = 'wallet',
   });
 
   bool get isIn => type == 'in';
   bool get isOut => type == 'out';
+  bool get isPocketTransfer => transferType == 'pocket_transfer';
 
   Map<String, dynamic> toJson() {
     return {
@@ -35,6 +38,7 @@ class SavingsRecord {
       'amount': amount,
       'note': note,
       'date': date.toIso8601String(),
+      'transferType': transferType,
     };
   }
 
@@ -49,6 +53,10 @@ class SavingsRecord {
       amount: (json['amount'] as num).toDouble(),
       note: json['note'] as String? ?? '',
       date: DateTime.parse(json['date'] as String),
+      transferType: json['transferType'] as String? ??
+          (json['note']?.toString().toLowerCase().contains('transfer') == true
+              ? 'pocket_transfer'
+              : 'wallet'),
     );
   }
 }
