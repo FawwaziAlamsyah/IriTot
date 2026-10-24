@@ -10,7 +10,7 @@ class AuthService {
   static const int sessionTimeoutMs = 5 * 60 * 1000;
 
   static const String defaultDisplayName = 'NewUser';
-  static const String defaultPin = '0000';
+  static const String defaultPin = '000000';
 
   final SharedPreferences _prefs;
 
@@ -33,7 +33,8 @@ class AuthService {
     if (!_prefs.containsKey(_keyDisplayName)) {
       await _prefs.setString(_keyDisplayName, defaultDisplayName);
     }
-    if (!_prefs.containsKey(_keyPin)) {
+    final existingPin = _prefs.getString(_keyPin);
+    if (existingPin == null || existingPin == '0000') {
       await _prefs.setString(_keyPin, defaultPin);
     }
   }
@@ -107,7 +108,7 @@ class AuthService {
     await _prefs.remove(_keyLastActiveTimestamp);
   }
 
-  // Update profil: Nama Tampilan dan opsional PIN baru
+  // Update profil: Nama Tampilan dan opsional PIN baru 6 digit
   Future<Map<String, dynamic>> updateProfile({
     required String newDisplayName,
     String? oldPin,
@@ -131,13 +132,13 @@ class AuthService {
         };
       }
       final cleanPin = newPin.trim();
-      if (cleanPin.length < 4) {
+      if (cleanPin.length != 6) {
         return {
           'success': false,
-          'message': 'PIN baru minimal 4 angka.',
+          'message': 'PIN baru harus 6 digit angka.',
         };
       }
-      if (!RegExp(r'^\d+$').hasMatch(cleanPin)) {
+      if (!RegExp(r'^\d{6}$').hasMatch(cleanPin)) {
         return {
           'success': false,
           'message': 'PIN hanya boleh berisi angka.',
@@ -154,7 +155,7 @@ class AuthService {
     };
   }
 
-  // Validasi dan Ubah PIN Keamanan
+  // Validasi dan Ubah PIN Keamanan (harus 6 digit angka)
   Future<Map<String, dynamic>> changePin({
     required String oldPin,
     required String newPin,
@@ -170,13 +171,13 @@ class AuthService {
     }
 
     final cleanPin = newPin.trim();
-    if (cleanPin.length < 4) {
+    if (cleanPin.length != 6) {
       return {
         'success': false,
-        'message': 'PIN baru minimal 4 angka.',
+        'message': 'PIN baru harus 6 digit angka.',
       };
     }
-    if (!RegExp(r'^\d+$').hasMatch(cleanPin)) {
+    if (!RegExp(r'^\d{6}$').hasMatch(cleanPin)) {
       return {
         'success': false,
         'message': 'PIN hanya boleh berisi angka.',

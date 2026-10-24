@@ -15,6 +15,7 @@ import 'screens/login_screen.dart';
 import 'screens/splash_screen.dart';
 import 'screens/add_transaction_modal.dart';
 import 'screens/ai_assistant_sheet.dart';
+import 'widgets/passcode_keypad.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -316,105 +317,57 @@ class _MainNavigationScaffoldState extends State<MainNavigationScaffold> {
     setState(() {});
   }
 
-  /// Asks for the security PIN before the Pocket tab opens. Returns true when verified.
+  /// Asks for the 6-digit security PIN before the Pocket tab opens.
   Future<bool> _confirmPocketAccess() async {
     final t = widget.localeService.t;
-    final ctrl = TextEditingController();
-    bool obscure = true;
-    String? error;
+    final keypadKey = GlobalKey<PasscodeKeypadState>();
 
-    final ok = await showDialog<bool>(
+    final ok = await showModalBottomSheet<bool>(
       context: context,
-      barrierDismissible: false,
-      builder: (dialogCtx) => StatefulBuilder(
-        builder: (ctx, setDialogState) {
-          void submit() {
-            if (widget.authService.verifyPin(ctrl.text)) {
-              Navigator.pop(dialogCtx, true);
-            } else {
-              setDialogState(() => error = t('verifyPinWrong'));
-            }
-          }
-
-          return AlertDialog(
-            backgroundColor: AppTheme.surfaceDark,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-              side: const BorderSide(color: AppTheme.borderDark),
-            ),
-            title: Row(
-              children: [
-                const Icon(Icons.pin_outlined, color: AppTheme.emeraldGreen, size: 22),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    t('verifyPinTitle'),
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
-                  ),
-                ),
-              ],
-            ),
-            content: Column(
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (bottomSheetCtx) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+        decoration: BoxDecoration(
+          color: AppTheme.bgDark,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          border: Border.all(color: AppTheme.borderDark, width: 1.2),
+        ),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            child: Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(t('verifyPinDesc'), style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: ctrl,
-                  autofocus: true,
-                  obscureText: obscure,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(6),
-                  ],
-                  style: const TextStyle(
-                    color: AppTheme.textPrimary,
-                    fontSize: 18,
-                    letterSpacing: 4,
-                    fontWeight: FontWeight.bold,
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.borderDark,
+                    borderRadius: BorderRadius.circular(2),
                   ),
-                  onSubmitted: (_) => submit(),
-                  decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.lock_outline, color: AppTheme.textMuted, size: 20),
-                    suffixIcon: IconButton(
-                      icon: Icon(obscure ? Icons.visibility : Icons.visibility_off, color: AppTheme.textMuted, size: 20),
-                      onPressed: () => setDialogState(() => obscure = !obscure),
-                    ),
-                    hintText: t('pinHint'),
-                    hintStyle: TextStyle(
-                      color: AppTheme.textMuted.withValues(alpha: 0.6),
-                      letterSpacing: 0,
-                      fontSize: 13,
-                      fontWeight: FontWeight.normal,
-                    ),
-                    errorText: error,
-                    filled: true,
-                    fillColor: AppTheme.surfaceLighter,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppTheme.borderDark)),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppTheme.borderDark)),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppTheme.emeraldGreen, width: 1.5)),
-                  ),
+                ),
+                PasscodeKeypad(
+                  key: keypadKey,
+                  pinLength: 6,
+                  title: t('verifyPinTitle'),
+                  subtitle: t('verifyPinDesc'),
+                  cancelLabel: t('cancel'),
+                  onCancel: () => Navigator.pop(bottomSheetCtx, false),
+                  onPinComplete: (pin) {
+                    if (widget.authService.verifyPin(pin)) {
+                      Navigator.pop(bottomSheetCtx, true);
+                    } else {
+                      keypadKey.currentState?.triggerError(t('verifyPinWrong'));
+                    }
+                  },
                 ),
               ],
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogCtx, false),
-                child: Text(t('cancel'), style: const TextStyle(color: AppTheme.textMuted)),
-              ),
-              ElevatedButton(
-                onPressed: submit,
-                style: ElevatedButton.styleFrom(backgroundColor: AppTheme.emeraldGreen, foregroundColor: Colors.black),
-                child: Text(t('verify'), style: const TextStyle(fontWeight: FontWeight.w700)),
-              ),
-            ],
-          );
-        },
+          ),
+        ),
       ),
     );
-    // Not disposed here: the dialog's exit animation still reads the controller.
     return ok ?? false;
   }
 

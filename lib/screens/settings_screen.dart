@@ -1114,12 +1114,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               setDialogState(() => dialogError = t('errOldRequired'));
                               return;
                             }
-                            if (newPin.length < 4) {
+                            if (newPin.length != 6) {
                               setDialogState(() => dialogError = t('errNewPassShort'));
                               return;
                             }
-                            if (!RegExp(r'^\d+$').hasMatch(newPin)) {
-                              setDialogState(() => dialogError = 'PIN hanya boleh berisi angka.');
+                            if (!RegExp(r'^\d{6}$').hasMatch(newPin)) {
+                              setDialogState(() => dialogError = 'PIN baru harus 6 digit angka.');
                               return;
                             }
                             if (newPin != confirmPin) {

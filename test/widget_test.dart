@@ -30,20 +30,15 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    // 1. Verify Login Screen elements (Default English PIN Login)
-    expect(find.text('Sign In with PIN'), findsOneWidget);
-    expect(find.text('Sign In to IRITOT'), findsOneWidget);
-    expect(find.text('Isi Default'), findsNothing);
-    expect(find.textContaining('Default: NewUser'), findsNothing);
+    // 1. Verify Login Screen elements (iOS Passcode style: Enter Passcode title, no submit button)
+    expect(find.text('Enter Passcode'), findsOneWidget);
+    expect(find.text('Sign In to IRITOT'), findsNothing); // No button needed
 
-    // 2. Enter default PIN (0000) into PIN text field
-    await tester.enterText(find.byType(TextField).first, '0000');
-
-    // 3. Tap Login Button
-    await tester.tap(find.text('Sign In to IRITOT'));
+    // 2. Enter default 6-digit PIN (000000) using on-screen numpad or synced input
+    await tester.enterText(find.byType(TextField).first, '000000');
     await tester.pumpAndSettle();
 
-    // 4. Verify Home Screen elements after successful login
+    // 4. Verify Home Screen elements after automatic successful login
     expect(find.text('IRITOT'), findsOneWidget);
     expect(find.text('PERSONAL'), findsOneWidget);
     expect(find.text('Spending'), findsOneWidget);
@@ -57,17 +52,15 @@ void main() {
     await tester.tap(find.text('Pocket'));
     await tester.pumpAndSettle();
 
-    // 5a. Pocket requires the PIN: a wrong PIN is rejected
-    expect(find.text('Verify PIN'), findsOneWidget);
+    // 5a. Pocket requires the 6-digit PIN: a wrong PIN is rejected with shake & error
+    expect(find.text('Enter Passcode'), findsOneWidget);
     expect(find.text('TOTAL SAVINGS'), findsNothing);
-    await tester.enterText(find.byType(TextField).last, '9999');
-    await tester.tap(find.text('Verify'));
+    await tester.enterText(find.byType(TextField).last, '999999');
     await tester.pumpAndSettle();
     expect(find.text('Incorrect PIN.'), findsOneWidget);
 
-    // 5b. The correct PIN opens Pocket
-    await tester.enterText(find.byType(TextField).last, '0000');
-    await tester.tap(find.text('Verify'));
+    // 5b. The correct 6-digit PIN auto-opens Pocket
+    await tester.enterText(find.byType(TextField).last, '000000');
     await tester.pumpAndSettle();
 
     // 6. Verify Savings Screen elements in English
@@ -83,17 +76,17 @@ void main() {
     final authService = await AuthService.init();
 
     // Initial default credentials
-    expect(authService.getPin(), '0000');
+    expect(authService.getPin(), '000000');
     expect(authService.getDisplayName(), 'NewUser');
     expect(authService.isLoggedIn(), false);
 
     // Login test with wrong PIN
-    final wrongLogin = await authService.login('9999');
+    final wrongLogin = await authService.login('999999');
     expect(wrongLogin, false);
     expect(authService.isLoggedIn(), false);
 
     // Login test with correct PIN
-    final correctLogin = await authService.login('0000');
+    final correctLogin = await authService.login('000000');
     expect(correctLogin, true);
     expect(authService.isLoggedIn(), true);
 
@@ -106,41 +99,41 @@ void main() {
 
     // Change PIN: test failure with incorrect old PIN
     final failOldPin = await authService.changePin(
-      oldPin: '9999',
-      newPin: '1234',
+      oldPin: '999999',
+      newPin: '123456',
     );
     expect(failOldPin['success'], false);
     expect(failOldPin['message'], contains('PIN lama salah'));
 
-    // Change PIN: test failure with short PIN (< 4 digits)
+    // Change PIN: test failure with short PIN (< 6 digits)
     final failShortPin = await authService.changePin(
-      oldPin: '0000',
-      newPin: '12',
+      oldPin: '000000',
+      newPin: '1234',
     );
     expect(failShortPin['success'], false);
-    expect(failShortPin['message'], contains('minimal 4 angka'));
+    expect(failShortPin['message'], contains('6 digit angka'));
 
     // Change PIN: test failure with non-digits
     final failLetterPin = await authService.changePin(
-      oldPin: '0000',
-      newPin: 'abcd',
+      oldPin: '000000',
+      newPin: 'abcdef',
     );
     expect(failLetterPin['success'], false);
     expect(failLetterPin['message'], contains('hanya boleh berisi angka'));
 
-    // Change PIN: test success with valid old and new PIN
+    // Change PIN: test success with valid old and new 6-digit PIN
     final successChange = await authService.changePin(
-      oldPin: '0000',
-      newPin: '1234',
+      oldPin: '000000',
+      newPin: '123456',
     );
     expect(successChange['success'], true);
-    expect(authService.getPin(), '1234');
+    expect(authService.getPin(), '123456');
 
     // Verify login with updated PIN
-    final oldLoginAttempt = await authService.login('0000');
+    final oldLoginAttempt = await authService.login('000000');
     expect(oldLoginAttempt, false);
 
-    final newLoginAttempt = await authService.login('1234');
+    final newLoginAttempt = await authService.login('123456');
     expect(newLoginAttempt, true);
 
     // Test logout
@@ -153,21 +146,21 @@ void main() {
     SharedPreferences.setMockInitialValues({});
 
     final authService = await AuthService.init();
-    expect(authService.getPin(), '0000');
+    expect(authService.getPin(), '000000');
     expect(authService.getDisplayName(), 'NewUser');
 
-    // Update display name and PIN together
+    // Update display name and 6-digit PIN together
     final updateResult = await authService.updateProfile(
       newDisplayName: 'Aji Pocket',
-      oldPin: '0000',
-      newPin: '4321',
+      oldPin: '000000',
+      newPin: '654321',
     );
     expect(updateResult['success'], true);
     expect(authService.getDisplayName(), 'Aji Pocket');
-    expect(authService.getPin(), '4321');
+    expect(authService.getPin(), '654321');
 
     // Verify login works with new PIN
-    final loginSuccess = await authService.login('4321');
+    final loginSuccess = await authService.login('654321');
     expect(loginSuccess, true);
     expect(authService.isLoggedIn(), true);
 
@@ -176,7 +169,7 @@ void main() {
     expect(authService.isLoggedIn(), false);
   });
 
-  testWidgets('LoginScreen renders PIN input and logs in successfully', (tester) async {
+  testWidgets('LoginScreen renders iOS-style passcode keypad and auto-submits on 6th digit', (tester) async {
     SharedPreferences.setMockInitialValues({});
     final authService = await AuthService.init();
     final localeService = await LocaleService.init();
@@ -196,19 +189,54 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Verify exactly one PIN TextField
-    expect(find.byType(TextField), findsOneWidget);
+    // Verify Passcode Title
+    expect(find.text('Enter Passcode'), findsOneWidget);
+    // Verify Keypad buttons 0-9 exist
+    for (int i = 0; i <= 9; i++) {
+      expect(find.text('$i'), findsWidgets);
+    }
 
-    // Enter wrong PIN
-    await tester.enterText(find.byType(TextField), '8888');
-    await tester.tap(find.text('Sign In to IRITOT'));
+    // Enter wrong PIN (6 digits: 888888)
+    await tester.enterText(find.byType(TextField).first, '888888');
     await tester.pumpAndSettle();
     expect(find.text('Incorrect PIN. Please try again.'), findsOneWidget);
     expect(loginSuccessCalled, false);
 
-    // Enter correct default PIN (0000)
-    await tester.enterText(find.byType(TextField), '0000');
-    await tester.tap(find.text('Sign In to IRITOT'));
+    // Enter correct default PIN (000000)
+    await tester.enterText(find.byType(TextField).first, '000000');
+    await tester.pumpAndSettle();
+    expect(loginSuccessCalled, true);
+  });
+
+  testWidgets('Tapping on-screen numpad buttons directly auto-logs in upon 6th digit', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final authService = await AuthService.init();
+    final localeService = await LocaleService.init();
+
+    bool loginSuccessCalled = false;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: LoginScreen(
+          authService: authService,
+          localeService: localeService,
+          onLoginSuccess: () {
+            loginSuccessCalled = true;
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Tap '0' button 6 times
+    final zeroFinder = find.widgetWithText(InkWell, '0');
+    expect(zeroFinder, findsOneWidget);
+
+    for (int i = 0; i < 6; i++) {
+      await tester.tap(zeroFinder);
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+
     await tester.pumpAndSettle();
     expect(loginSuccessCalled, true);
   });
@@ -224,7 +252,7 @@ void main() {
     expect(localeService.isEnglish, true);
     expect(localeService.isIndonesian, false);
     expect(localeService.t('navHome'), 'Home');
-    expect(localeService.t('loginTitle'), 'Sign In with PIN');
+    expect(localeService.t('loginTitle'), 'Enter Passcode');
 
     // Switch to Indonesian
     await localeService.setLocale('id');
@@ -232,7 +260,7 @@ void main() {
     expect(localeService.isEnglish, false);
     expect(localeService.isIndonesian, true);
     expect(localeService.t('navHome'), 'Beranda');
-    expect(localeService.t('loginTitle'), 'Masuk dengan PIN');
+    expect(localeService.t('loginTitle'), 'Masukkan PIN');
 
     // Switch back to English
     await localeService.setLocale('en');
@@ -249,7 +277,7 @@ void main() {
 
     // Login at t0
     final t0 = DateTime.now().millisecondsSinceEpoch;
-    await authService.login('0000');
+    await authService.login('000000');
     await authService.updateLastActiveTimestamp(t0);
     expect(authService.isLoggedIn(), true);
 
@@ -317,7 +345,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pumpAndSettle();
 
-    // Verify smooth transition to LoginScreen with PIN
-    expect(find.text('Sign In with PIN'), findsOneWidget);
+    // Verify smooth transition to LoginScreen with Enter Passcode
+    expect(find.text('Enter Passcode'), findsOneWidget);
   });
 }
