@@ -30,15 +30,14 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    // 1. Verify Login Screen elements (Default English, Clean UI without default buttons)
-    expect(find.text('Sign In to Your Account'), findsOneWidget);
+    // 1. Verify Login Screen elements (Default English PIN Login)
+    expect(find.text('Sign In with PIN'), findsOneWidget);
     expect(find.text('Sign In to IRITOT'), findsOneWidget);
     expect(find.text('Isi Default'), findsNothing);
     expect(find.textContaining('Default: NewUser'), findsNothing);
 
-    // 2. Enter credentials into empty text fields
-    await tester.enterText(find.byType(TextField).at(0), 'NewUser');
-    await tester.enterText(find.byType(TextField).at(1), 'iritot123');
+    // 2. Enter default PIN (0000) into PIN text field
+    await tester.enterText(find.byType(TextField).first, '0000');
 
     // 3. Tap Login Button
     await tester.tap(find.text('Sign In to IRITOT'));
@@ -58,16 +57,16 @@ void main() {
     await tester.tap(find.text('Pocket'));
     await tester.pumpAndSettle();
 
-    // 5a. Pocket requires the password again: a wrong one is rejected
-    expect(find.text('Verify Password'), findsOneWidget);
+    // 5a. Pocket requires the PIN: a wrong PIN is rejected
+    expect(find.text('Verify PIN'), findsOneWidget);
     expect(find.text('TOTAL SAVINGS'), findsNothing);
-    await tester.enterText(find.byType(TextField).last, 'wrong-pass');
+    await tester.enterText(find.byType(TextField).last, '9999');
     await tester.tap(find.text('Verify'));
     await tester.pumpAndSettle();
-    expect(find.text('Incorrect password.'), findsOneWidget);
+    expect(find.text('Incorrect PIN.'), findsOneWidget);
 
-    // 5b. The correct password opens Pocket
-    await tester.enterText(find.byType(TextField).last, 'iritot123');
+    // 5b. The correct PIN opens Pocket
+    await tester.enterText(find.byType(TextField).last, '0000');
     await tester.tap(find.text('Verify'));
     await tester.pumpAndSettle();
 
@@ -84,74 +83,64 @@ void main() {
     final authService = await AuthService.init();
 
     // Initial default credentials
-    expect(authService.getUsername(), 'NewUser');
+    expect(authService.getPin(), '0000');
     expect(authService.getDisplayName(), 'NewUser');
     expect(authService.isLoggedIn(), false);
 
-    // Login test with wrong password
-    final wrongLogin = await authService.login('NewUser', 'wrongpass');
+    // Login test with wrong PIN
+    final wrongLogin = await authService.login('9999');
     expect(wrongLogin, false);
     expect(authService.isLoggedIn(), false);
 
-    // Login test with correct credentials
-    final correctLogin = await authService.login('NewUser', 'iritot123');
+    // Login test with correct PIN
+    final correctLogin = await authService.login('0000');
     expect(correctLogin, true);
     expect(authService.isLoggedIn(), true);
 
-    // Update profile test (Display Name and Username)
+    // Update profile test (Display Name)
     final profileUpdate = await authService.updateProfile(
       newDisplayName: 'Aji Finance',
-      newUsername: 'ajifinance',
     );
     expect(profileUpdate['success'], true);
     expect(authService.getDisplayName(), 'Aji Finance');
-    expect(authService.getUsername(), 'ajifinance');
 
-    // Change credentials: test failure with incorrect old username
-    final failOldUser = await authService.changeCredentials(
-      oldUsername: 'wronguser',
-      oldPassword: 'iritot123',
-      newUsername: 'ajifinance',
-      newPassword: 'newpassword123',
+    // Change PIN: test failure with incorrect old PIN
+    final failOldPin = await authService.changePin(
+      oldPin: '9999',
+      newPin: '1234',
     );
-    expect(failOldUser['success'], false);
-    expect(failOldUser['message'], contains('Username lama tidak sesuai'));
+    expect(failOldPin['success'], false);
+    expect(failOldPin['message'], contains('PIN lama salah'));
 
-    // Change credentials: test failure with incorrect old password
-    final failOldPass = await authService.changeCredentials(
-      oldUsername: 'ajifinance',
-      oldPassword: 'wrongoldpassword',
-      newUsername: 'ajifinance',
-      newPassword: 'newpassword123',
+    // Change PIN: test failure with short PIN (< 4 digits)
+    final failShortPin = await authService.changePin(
+      oldPin: '0000',
+      newPin: '12',
     );
-    expect(failOldPass['success'], false);
-    expect(failOldPass['message'], contains('Password lama salah'));
+    expect(failShortPin['success'], false);
+    expect(failShortPin['message'], contains('minimal 4 angka'));
 
-    // Change credentials: test failure with short password (< 4 chars)
-    final failShortPass = await authService.changeCredentials(
-      oldUsername: 'ajifinance',
-      oldPassword: 'iritot123',
-      newUsername: 'ajifinance',
-      newPassword: '12',
+    // Change PIN: test failure with non-digits
+    final failLetterPin = await authService.changePin(
+      oldPin: '0000',
+      newPin: 'abcd',
     );
-    expect(failShortPass['success'], false);
-    expect(failShortPass['message'], contains('minimal 4 karakter'));
+    expect(failLetterPin['success'], false);
+    expect(failLetterPin['message'], contains('hanya boleh berisi angka'));
 
-    // Change credentials: test success with valid old and new credentials
-    final successChange = await authService.changeCredentials(
-      oldUsername: 'ajifinance',
-      oldPassword: 'iritot123',
-      newUsername: 'ajifinance',
-      newPassword: 'newpassword123',
+    // Change PIN: test success with valid old and new PIN
+    final successChange = await authService.changePin(
+      oldPin: '0000',
+      newPin: '1234',
     );
     expect(successChange['success'], true);
-    expect(authService.getUsername(), 'ajifinance');
+    expect(authService.getPin(), '1234');
 
-    // Verify login with updated credentials
-    final oldLoginAttempt = await authService.login('NewUser', 'iritot123');
+    // Verify login with updated PIN
+    final oldLoginAttempt = await authService.login('0000');
     expect(oldLoginAttempt, false);
 
-    final newLoginAttempt = await authService.login('ajifinance', 'newpassword123');
+    final newLoginAttempt = await authService.login('1234');
     expect(newLoginAttempt, true);
 
     // Test logout
@@ -159,65 +148,69 @@ void main() {
     expect(authService.isLoggedIn(), false);
   });
 
-  test('AuthService Remember Me saves username only, password is never saved', () async {
+  test('AuthService updateProfile supports changing PIN and display name simultaneously', () async {
     TestWidgetsFlutterBinding.ensureInitialized();
     SharedPreferences.setMockInitialValues({});
 
     final authService = await AuthService.init();
-    expect(authService.isRememberMe(), true);
-    expect(authService.getSavedUsername(), 'NewUser');
+    expect(authService.getPin(), '0000');
+    expect(authService.getDisplayName(), 'NewUser');
 
-    // Login with rememberMe: true
-    await authService.login('NewUser', 'iritot123', rememberMe: true);
-    expect(authService.getSavedUsername(), 'NewUser');
+    // Update display name and PIN together
+    final updateResult = await authService.updateProfile(
+      newDisplayName: 'Aji Pocket',
+      oldPin: '0000',
+      newPin: '4321',
+    );
+    expect(updateResult['success'], true);
+    expect(authService.getDisplayName(), 'Aji Pocket');
+    expect(authService.getPin(), '4321');
 
-    // Update username in profile
-    await authService.updateProfile(newDisplayName: 'Aji', newUsername: 'aji_finance');
-    expect(authService.getSavedUsername(), 'aji_finance');
+    // Verify login works with new PIN
+    final loginSuccess = await authService.login('4321');
+    expect(loginSuccess, true);
+    expect(authService.isLoggedIn(), true);
 
     // Logout
     await authService.logout();
     expect(authService.isLoggedIn(), false);
-    // Remembered username is still preserved after logout
-    expect(authService.getSavedUsername(), 'aji_finance');
-
-    // Login with rememberMe: false
-    await authService.login('aji_finance', 'iritot123', rememberMe: false);
-    expect(authService.isRememberMe(), false);
-    expect(authService.getSavedUsername(), null);
-
-    // Logout
-    await authService.logout();
-    expect(authService.getSavedUsername(), null);
   });
 
-  testWidgets('LoginScreen pre-fills remembered username and leaves password empty', (tester) async {
-    SharedPreferences.setMockInitialValues({
-      'iritot_auth_remember_me': true,
-      'iritot_auth_saved_username': 'myuser',
-    });
+  testWidgets('LoginScreen renders PIN input and logs in successfully', (tester) async {
+    SharedPreferences.setMockInitialValues({});
     final authService = await AuthService.init();
     final localeService = await LocaleService.init();
+
+    bool loginSuccessCalled = false;
 
     await tester.pumpWidget(
       MaterialApp(
         home: LoginScreen(
           authService: authService,
           localeService: localeService,
-          onLoginSuccess: () {},
+          onLoginSuccess: () {
+            loginSuccessCalled = true;
+          },
         ),
       ),
     );
     await tester.pumpAndSettle();
 
-    // Verify username TextField has 'myuser'
-    final usernameFinder = find.widgetWithText(TextField, 'myuser');
-    expect(usernameFinder, findsOneWidget);
+    // Verify exactly one PIN TextField
+    expect(find.byType(TextField), findsOneWidget);
 
-    // Verify password field is completely empty
-    final passwordFields = tester.widgetList<TextField>(find.byType(TextField)).where((tf) => tf.obscureText);
-    expect(passwordFields.length, 1);
-    expect(passwordFields.first.controller?.text, '');
+    // Enter wrong PIN
+    await tester.enterText(find.byType(TextField), '8888');
+    await tester.tap(find.text('Sign In to IRITOT'));
+    await tester.pumpAndSettle();
+    expect(find.text('Incorrect PIN. Please try again.'), findsOneWidget);
+    expect(loginSuccessCalled, false);
+
+    // Enter correct default PIN (0000)
+    await tester.enterText(find.byType(TextField), '0000');
+    await tester.tap(find.text('Sign In to IRITOT'));
+    await tester.pumpAndSettle();
+    expect(loginSuccessCalled, true);
   });
 
   test('LocaleService default English and language switching test', () async {
@@ -231,7 +224,7 @@ void main() {
     expect(localeService.isEnglish, true);
     expect(localeService.isIndonesian, false);
     expect(localeService.t('navHome'), 'Home');
-    expect(localeService.t('loginTitle'), 'Sign In to Your Account');
+    expect(localeService.t('loginTitle'), 'Sign In with PIN');
 
     // Switch to Indonesian
     await localeService.setLocale('id');
@@ -239,7 +232,7 @@ void main() {
     expect(localeService.isEnglish, false);
     expect(localeService.isIndonesian, true);
     expect(localeService.t('navHome'), 'Beranda');
-    expect(localeService.t('loginTitle'), 'Masuk ke Akun Anda');
+    expect(localeService.t('loginTitle'), 'Masuk dengan PIN');
 
     // Switch back to English
     await localeService.setLocale('en');
@@ -256,7 +249,7 @@ void main() {
 
     // Login at t0
     final t0 = DateTime.now().millisecondsSinceEpoch;
-    await authService.login('NewUser', 'iritot123');
+    await authService.login('0000');
     await authService.updateLastActiveTimestamp(t0);
     expect(authService.isLoggedIn(), true);
 
@@ -324,7 +317,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pumpAndSettle();
 
-    // Verify smooth transition to LoginScreen
-    expect(find.text('Sign In to Your Account'), findsOneWidget);
+    // Verify smooth transition to LoginScreen with PIN
+    expect(find.text('Sign In with PIN'), findsOneWidget);
   });
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../services/auth_service.dart';
 import '../services/locale_service.dart';
 import '../theme/app_theme.dart';
@@ -22,10 +23,8 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController _usernameController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  bool _obscurePassword = true;
-  bool _rememberMe = true;
+  final TextEditingController _pinController = TextEditingController();
+  bool _obscurePin = true;
   String? _errorMessage;
   bool _isLoading = false;
 
@@ -33,13 +32,6 @@ class _LoginScreenState extends State<LoginScreen> {
   void initState() {
     super.initState();
     _errorMessage = widget.initialErrorMessage;
-    _rememberMe = widget.authService.isRememberMe();
-    if (_rememberMe) {
-      final saved = widget.authService.getSavedUsername();
-      if (saved != null && saved.isNotEmpty) {
-        _usernameController.text = saved;
-      }
-    }
   }
 
   @override
@@ -55,8 +47,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
-    _usernameController.dispose();
-    _passwordController.dispose();
+    _pinController.dispose();
     super.dispose();
   }
 
@@ -66,10 +57,9 @@ class _LoginScreenState extends State<LoginScreen> {
       _errorMessage = null;
     });
 
-    final username = _usernameController.text.trim();
-    final password = _passwordController.text;
+    final pin = _pinController.text.trim();
 
-    if (username.isEmpty || password.isEmpty) {
+    if (pin.isEmpty) {
       setState(() {
         _errorMessage = widget.localeService.t('errEmptyLogin');
         _isLoading = false;
@@ -77,11 +67,7 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    final success = await widget.authService.login(
-      username,
-      password,
-      rememberMe: _rememberMe,
-    );
+    final success = await widget.authService.login(pin);
 
     if (mounted) {
       setState(() {
@@ -146,7 +132,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 32),
 
-                // Card Login
+                // Card Login PIN
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(24),
@@ -201,47 +187,40 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
 
-                      // Field Username
+                      // Field PIN
                       Text(
-                        '${t('username')}:',
+                        '${t('pin')}:',
                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 8),
                       TextField(
-                        controller: _usernameController,
-                        style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14),
-                        decoration: InputDecoration(
-                          prefixIcon: const Icon(Icons.person_outline, color: AppTheme.textMuted, size: 20),
-                          hintText: t('usernameHint'),
-                          hintStyle: TextStyle(color: AppTheme.textMuted.withValues(alpha: 0.6)),
-                          filled: true,
-                          fillColor: AppTheme.surfaceLighter,
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppTheme.borderDark)),
-                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppTheme.borderDark)),
-                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppTheme.emeraldGreen, width: 1.5)),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        controller: _pinController,
+                        autofocus: true,
+                        obscureText: _obscurePin,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(6),
+                        ],
+                        style: const TextStyle(
+                          color: AppTheme.textPrimary,
+                          fontSize: 18,
+                          letterSpacing: 4,
+                          fontWeight: FontWeight.bold,
                         ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Field Password
-                      Text(
-                        '${t('password')}:',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
-                      ),
-                      const SizedBox(height: 6),
-                      TextField(
-                        controller: _passwordController,
-                        obscureText: _obscurePassword,
-                        style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14),
                         decoration: InputDecoration(
-                          prefixIcon: const Icon(Icons.lock_outline, color: AppTheme.textMuted, size: 20),
+                          prefixIcon: const Icon(Icons.pin_outlined, color: AppTheme.textMuted, size: 20),
                           suffixIcon: IconButton(
-                            icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off, color: AppTheme.textMuted, size: 20),
-                            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                            icon: Icon(_obscurePin ? Icons.visibility : Icons.visibility_off, color: AppTheme.textMuted, size: 20),
+                            onPressed: () => setState(() => _obscurePin = !_obscurePin),
                           ),
-                          hintText: t('passwordHint'),
-                          hintStyle: TextStyle(color: AppTheme.textMuted.withValues(alpha: 0.6)),
+                          hintText: t('pinHint'),
+                          hintStyle: TextStyle(
+                            color: AppTheme.textMuted.withValues(alpha: 0.6),
+                            letterSpacing: 0,
+                            fontSize: 13,
+                            fontWeight: FontWeight.normal,
+                          ),
                           filled: true,
                           fillColor: AppTheme.surfaceLighter,
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppTheme.borderDark)),
@@ -250,45 +229,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                         ),
                         onSubmitted: (_) => _handleLogin(),
-                      ),
-                      const SizedBox(height: 18),
-
-                      // Ingat Saya (Menyimpan username saja, password wajib ketik manual)
-                      InkWell(
-                        onTap: () {
-                          final isChecked = !_rememberMe;
-                          setState(() => _rememberMe = isChecked);
-                          widget.authService.setRememberMe(isChecked);
-                        },
-                        borderRadius: BorderRadius.circular(8),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: Checkbox(
-                                  value: _rememberMe,
-                                  activeColor: AppTheme.emeraldGreen,
-                                  checkColor: Colors.black,
-                                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                  visualDensity: VisualDensity.compact,
-                                  side: const BorderSide(color: AppTheme.borderDark),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                                  onChanged: (val) {
-                                    final isChecked = val ?? true;
-                                    setState(() => _rememberMe = isChecked);
-                                    widget.authService.setRememberMe(isChecked);
-                                  },
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Text(t('rememberMe'), style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
-                            ],
-                          ),
-                        ),
                       ),
                       const SizedBox(height: 24),
 

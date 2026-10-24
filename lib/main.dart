@@ -316,7 +316,7 @@ class _MainNavigationScaffoldState extends State<MainNavigationScaffold> {
     setState(() {});
   }
 
-  /// Asks for the account password before the Pocket tab opens. Returns true when verified.
+  /// Asks for the security PIN before the Pocket tab opens. Returns true when verified.
   Future<bool> _confirmPocketAccess() async {
     final t = widget.localeService.t;
     final ctrl = TextEditingController();
@@ -329,10 +329,10 @@ class _MainNavigationScaffoldState extends State<MainNavigationScaffold> {
       builder: (dialogCtx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
           void submit() {
-            if (widget.authService.verifyPassword(ctrl.text)) {
+            if (widget.authService.verifyPin(ctrl.text)) {
               Navigator.pop(dialogCtx, true);
             } else {
-              setDialogState(() => error = t('verifyPasswordWrong'));
+              setDialogState(() => error = t('verifyPinWrong'));
             }
           }
 
@@ -344,11 +344,11 @@ class _MainNavigationScaffoldState extends State<MainNavigationScaffold> {
             ),
             title: Row(
               children: [
-                const Icon(Icons.lock_outline, color: AppTheme.emeraldGreen, size: 22),
+                const Icon(Icons.pin_outlined, color: AppTheme.emeraldGreen, size: 22),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    t('verifyPasswordTitle'),
+                    t('verifyPinTitle'),
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
                   ),
                 ),
@@ -358,13 +358,23 @@ class _MainNavigationScaffoldState extends State<MainNavigationScaffold> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(t('verifyPasswordDesc'), style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                Text(t('verifyPinDesc'), style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
                 const SizedBox(height: 12),
                 TextField(
                   controller: ctrl,
                   autofocus: true,
                   obscureText: obscure,
-                  style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(6),
+                  ],
+                  style: const TextStyle(
+                    color: AppTheme.textPrimary,
+                    fontSize: 18,
+                    letterSpacing: 4,
+                    fontWeight: FontWeight.bold,
+                  ),
                   onSubmitted: (_) => submit(),
                   decoration: InputDecoration(
                     prefixIcon: const Icon(Icons.lock_outline, color: AppTheme.textMuted, size: 20),
@@ -372,12 +382,19 @@ class _MainNavigationScaffoldState extends State<MainNavigationScaffold> {
                       icon: Icon(obscure ? Icons.visibility : Icons.visibility_off, color: AppTheme.textMuted, size: 20),
                       onPressed: () => setDialogState(() => obscure = !obscure),
                     ),
-                    hintText: t('passwordHint'),
-                    hintStyle: TextStyle(color: AppTheme.textMuted.withValues(alpha: 0.6)),
+                    hintText: t('pinHint'),
+                    hintStyle: TextStyle(
+                      color: AppTheme.textMuted.withValues(alpha: 0.6),
+                      letterSpacing: 0,
+                      fontSize: 13,
+                      fontWeight: FontWeight.normal,
+                    ),
                     errorText: error,
                     filled: true,
                     fillColor: AppTheme.surfaceLighter,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppTheme.borderDark)),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppTheme.borderDark)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppTheme.emeraldGreen, width: 1.5)),
                   ),
                 ),
               ],

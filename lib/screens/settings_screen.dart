@@ -901,16 +901,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final t = widget.localeService.t;
     final scaffoldMessenger = ScaffoldMessenger.of(context);
     final displayNameCtrl = TextEditingController(text: widget.authService.getDisplayName());
-    final usernameCtrl = TextEditingController(text: widget.authService.getUsername());
-    final oldPassCtrl = TextEditingController();
-    final newPassCtrl = TextEditingController();
-    final confirmPassCtrl = TextEditingController();
+    final oldPinCtrl = TextEditingController();
+    final newPinCtrl = TextEditingController();
+    final confirmPinCtrl = TextEditingController();
 
-    bool changePassword = false;
+    bool changePin = false;
     String? dialogError;
-    bool obscureOldPass = true;
-    bool obscureNewPass = true;
-    bool obscureConfirmPass = true;
+    bool obscureOldPin = true;
+    bool obscureNewPin = true;
+    bool obscureConfirmPin = true;
     bool isSubmitting = false;
 
     showDialog(
@@ -989,101 +988,99 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         ),
                       ),
-                      const SizedBox(height: 10),
-
-                      // Username Akun
-                      Text(t('newUsernameLabel'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
-                      const SizedBox(height: 4),
-                      TextField(
-                        controller: usernameCtrl,
-                        style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
-                        decoration: InputDecoration(
-                          hintText: t('newUsernameHint'),
-                          hintStyle: TextStyle(color: AppTheme.textMuted.withValues(alpha: 0.5)),
-                          filled: true,
-                          fillColor: AppTheme.surfaceLighter,
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppTheme.borderDark)),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        ),
-                      ),
                       const SizedBox(height: 12),
 
-                      // Checkbox Ganti Kata Sandi
+                      // Checkbox Ganti PIN
                       CheckboxListTile(
                         contentPadding: EdgeInsets.zero,
                         dense: true,
-                        value: changePassword,
+                        value: changePin,
                         activeColor: AppTheme.cyanAccent,
                         title: Text(
-                          t('changePasswordCheck'),
+                          t('changePinCheck'),
                           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
                         ),
-                        onChanged: (val) => setDialogState(() => changePassword = val ?? false),
+                        onChanged: (val) => setDialogState(() => changePin = val ?? false),
                         controlAffinity: ListTileControlAffinity.leading,
                       ),
 
-                      if (changePassword) ...[
+                      if (changePin) ...[
                         const SizedBox(height: 8),
-                        // Password Lama
-                        Text(t('oldPasswordLabel'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+                        // PIN Lama
+                        Text(t('oldPinLabel'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
                         const SizedBox(height: 4),
                         TextField(
-                          controller: oldPassCtrl,
-                          obscureText: obscureOldPass,
-                          style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
+                          controller: oldPinCtrl,
+                          obscureText: obscureOldPin,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(6),
+                          ],
+                          style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14, letterSpacing: 2),
                           decoration: InputDecoration(
-                            hintText: t('oldPasswordHint'),
-                            hintStyle: TextStyle(color: AppTheme.textMuted.withValues(alpha: 0.5)),
+                            hintText: t('oldPinHint'),
+                            hintStyle: TextStyle(color: AppTheme.textMuted.withValues(alpha: 0.5), letterSpacing: 0),
                             filled: true,
                             fillColor: AppTheme.surfaceLighter,
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppTheme.borderDark)),
                             suffixIcon: IconButton(
-                              icon: Icon(obscureOldPass ? Icons.visibility : Icons.visibility_off, color: AppTheme.textMuted, size: 18),
-                              onPressed: () => setDialogState(() => obscureOldPass = !obscureOldPass),
+                              icon: Icon(obscureOldPin ? Icons.visibility : Icons.visibility_off, color: AppTheme.textMuted, size: 18),
+                              onPressed: () => setDialogState(() => obscureOldPin = !obscureOldPin),
                             ),
                             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           ),
                         ),
                         const SizedBox(height: 10),
 
-                        // Password Baru
-                        Text(t('newPasswordLabel'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+                        // PIN Baru
+                        Text(t('newPinLabel'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
                         const SizedBox(height: 4),
                         TextField(
-                          controller: newPassCtrl,
-                          obscureText: obscureNewPass,
-                          style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
+                          controller: newPinCtrl,
+                          obscureText: obscureNewPin,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(6),
+                          ],
+                          style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14, letterSpacing: 2),
                           decoration: InputDecoration(
-                            hintText: t('newPasswordHint'),
-                            hintStyle: TextStyle(color: AppTheme.textMuted.withValues(alpha: 0.5)),
+                            hintText: t('newPinHint'),
+                            hintStyle: TextStyle(color: AppTheme.textMuted.withValues(alpha: 0.5), letterSpacing: 0),
                             filled: true,
                             fillColor: AppTheme.surfaceLighter,
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppTheme.borderDark)),
                             suffixIcon: IconButton(
-                              icon: Icon(obscureNewPass ? Icons.visibility : Icons.visibility_off, color: AppTheme.textMuted, size: 18),
-                              onPressed: () => setDialogState(() => obscureNewPass = !obscureNewPass),
+                              icon: Icon(obscureNewPin ? Icons.visibility : Icons.visibility_off, color: AppTheme.textMuted, size: 18),
+                              onPressed: () => setDialogState(() => obscureNewPin = !obscureNewPin),
                             ),
                             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           ),
                         ),
                         const SizedBox(height: 10),
 
-                        // Konfirmasi Password Baru
-                        Text(t('confirmPasswordLabel'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+                        // Konfirmasi PIN Baru
+                        Text(t('confirmPinLabel'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
                         const SizedBox(height: 4),
                         TextField(
-                          controller: confirmPassCtrl,
-                          obscureText: obscureConfirmPass,
-                          style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
+                          controller: confirmPinCtrl,
+                          obscureText: obscureConfirmPin,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(6),
+                          ],
+                          style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14, letterSpacing: 2),
                           decoration: InputDecoration(
-                            hintText: t('confirmPasswordHint'),
-                            hintStyle: TextStyle(color: AppTheme.textMuted.withValues(alpha: 0.5)),
+                            hintText: t('confirmPinHint'),
+                            hintStyle: TextStyle(color: AppTheme.textMuted.withValues(alpha: 0.5), letterSpacing: 0),
                             filled: true,
                             fillColor: AppTheme.surfaceLighter,
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppTheme.borderDark)),
                             suffixIcon: IconButton(
-                              icon: Icon(obscureConfirmPass ? Icons.visibility : Icons.visibility_off, color: AppTheme.textMuted, size: 18),
-                              onPressed: () => setDialogState(() => obscureConfirmPass = !obscureConfirmPass),
+                              icon: Icon(obscureConfirmPin ? Icons.visibility : Icons.visibility_off, color: AppTheme.textMuted, size: 18),
+                              onPressed: () => setDialogState(() => obscureConfirmPin = !obscureConfirmPin),
                             ),
                             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           ),
@@ -1103,30 +1100,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ? null
                       : () async {
                           final newName = displayNameCtrl.text.trim();
-                          final newUser = usernameCtrl.text.trim();
-                          final oldPass = oldPassCtrl.text;
-                          final newPass = newPassCtrl.text;
-                          final confirmPass = confirmPassCtrl.text;
+                          final oldPin = oldPinCtrl.text.trim();
+                          final newPin = newPinCtrl.text.trim();
+                          final confirmPin = confirmPinCtrl.text.trim();
 
                           if (newName.isEmpty) {
                             setDialogState(() => dialogError = 'Nama tampilan tidak boleh kosong.');
                             return;
                           }
-                          if (newUser.isEmpty) {
-                            setDialogState(() => dialogError = t('errNewUserEmpty'));
-                            return;
-                          }
 
-                          if (changePassword) {
-                            if (oldPass.isEmpty) {
+                          if (changePin) {
+                            if (oldPin.isEmpty) {
                               setDialogState(() => dialogError = t('errOldRequired'));
                               return;
                             }
-                            if (newPass.length < 4) {
+                            if (newPin.length < 4) {
                               setDialogState(() => dialogError = t('errNewPassShort'));
                               return;
                             }
-                            if (newPass != confirmPass) {
+                            if (!RegExp(r'^\d+$').hasMatch(newPin)) {
+                              setDialogState(() => dialogError = 'PIN hanya boleh berisi angka.');
+                              return;
+                            }
+                            if (newPin != confirmPin) {
                               setDialogState(() => dialogError = t('errPassMismatch'));
                               return;
                             }
@@ -1139,9 +1135,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                           final result = await widget.authService.updateProfile(
                             newDisplayName: newName,
-                            newUsername: newUser,
-                            oldPassword: changePassword ? oldPass : null,
-                            newPassword: changePassword ? newPass : null,
+                            oldPin: changePin ? oldPin : null,
+                            newPin: changePin ? newPin : null,
                           );
 
                           if (result['success'] == true) {
@@ -1339,9 +1334,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
                                 ),
                                 const SizedBox(height: 2),
-                                Text(
-                                  '@${widget.authService.getUsername()}',
-                                  style: const TextStyle(fontSize: 12, color: AppTheme.cyanAccent, fontWeight: FontWeight.w500),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.pin_outlined, size: 12, color: AppTheme.cyanAccent),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      t('securityPinActive'),
+                                      style: const TextStyle(fontSize: 12, color: AppTheme.cyanAccent, fontWeight: FontWeight.w500),
+                                    ),
+                                  ],
                                 ),
                                 const SizedBox(height: 3),
                                 Row(
