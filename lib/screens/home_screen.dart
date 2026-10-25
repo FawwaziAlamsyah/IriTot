@@ -275,6 +275,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       final bytes = await file.readAsBytes();
       final result = await widget.aiService.analyzeReceiptImage(
         imageBytes: bytes,
+        filePath: file.path,
         wallets: widget.storageService.getWallets(),
         categories: widget.storageService.getCategories(),
       );

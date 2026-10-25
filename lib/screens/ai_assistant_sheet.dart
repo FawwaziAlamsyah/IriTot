@@ -271,6 +271,7 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
 
       final result = await widget.aiService.analyzeReceiptImage(
         imageBytes: bytes,
+        filePath: file.path,
         wallets: wallets,
         categories: categories,
       );

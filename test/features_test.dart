@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:iritot/services/storage_service.dart';
@@ -268,6 +269,25 @@ void main() {
     expect(receiptRes['success'], isTrue);
     expect(receiptRes.containsKey('merchant'), isTrue);
     expect(receiptRes.containsKey('amount'), isTrue);
+  });
+
+  test('OCR scan on contoh_billing.jpeg extracts SUSHIRO title as note and 278355 as amount', () async {
+    final ai = await AiService.init();
+    final storage = await StorageService.init();
+    final billingFile = File('contoh_billing.jpeg');
+    if (billingFile.existsSync()) {
+      final bytes = await billingFile.readAsBytes();
+      final res = await ai.analyzeReceiptImage(
+        imageBytes: bytes,
+        filePath: billingFile.path,
+        wallets: storage.getWallets(),
+        categories: storage.getCategories(),
+      );
+      expect(res['success'], isTrue);
+      expect(res['amount'], 278355.0);
+      expect(res['note'].toString().toUpperCase(), contains('SUSHIRO'));
+      expect(res['merchant'].toString().toUpperCase(), contains('SUSHIRO'));
+    }
   });
 
   test('Voice parser syncs with the user categories and wallets when spoken', () async {

@@ -238,6 +238,7 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
       final bytes = await file.readAsBytes();
       final result = await widget.aiService.analyzeReceiptImage(
         imageBytes: bytes,
+        filePath: file.path,
         wallets: _wallets,
         categories: _categories,
       );

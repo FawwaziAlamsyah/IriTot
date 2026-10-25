@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
@@ -360,10 +362,15 @@ Instruksi Respons:
   // Analisis Multimodal Struk / Bill Belanja
   Future<Map<String, dynamic>> analyzeReceiptImage({
     required List<int> imageBytes,
+    String? filePath,
     String mimeType = 'image/jpeg',
     required List<Wallet> wallets,
     required List<CategoryItem> categories,
   }) async {
+    final defaultCat = categories.isNotEmpty ? categories.first.id : 'cat_food';
+    final defaultWallet = wallets.isNotEmpty ? wallets.first.id : 'w_cash';
+
+    // 1. Coba Gemini Vision jika API Key tersedia
     final apiKey = getApiKey();
     if (apiKey.isNotEmpty && getProvider() == 'gemini') {
       try {
@@ -372,16 +379,19 @@ Instruksi Respons:
             'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey');
 
         final prompt = """
-Analisis gambar struk/bill belanja ini secara teliti.
+Analisis gambar struk / nota / billing pembayaran ini secara teliti.
 Ekstrak informasi penting dan kembalikan HANYA format JSON valid tanpa format markdown:
 {
-  "merchant": "Nama toko / merchant / tempat belanja",
+  "merchant": "Nama toko / merchant / tempat / judul billing saja",
   "amount": total_nominal_akhir_angka_saja,
   "date": "yyyy-MM-dd",
   "category": "makanan / belanja / transportasi / tagihan / hiburan / umum",
-  "note": "Rincian singkat item belanja"
+  "note": "HANYA nama toko / merchant / judul billing saja tanpa rincian item belanja"
 }
-Contoh: {"merchant": "Indomaret", "amount": 45000, "date": "2026-10-23", "category": "belanja", "note": "Roti, Susu, Air"}
+Contoh: {"merchant": "SUSHIRO", "amount": 278355, "date": "2026-10-25", "category": "makanan", "note": "SUSHIRO"}
+ATURAN PENTING:
+- "amount" harus berupa angka total tagihan akhir / Grand Total (termasuk pajak & service bila ada).
+- "note" dan "merchant" HANYA berisi judul billing / nama merchant (misal: "SUSHIRO"). JANGAN masukkan rincian menu / barang ke note.
 """;
 
         final response = await http.post(
@@ -406,7 +416,7 @@ Contoh: {"merchant": "Indomaret", "amount": 45000, "date": "2026-10-23", "catego
               'maxOutputTokens': 300,
             }
           }),
-        );
+        ).timeout(const Duration(seconds: 15));
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
@@ -418,7 +428,10 @@ Contoh: {"merchant": "Indomaret", "amount": 45000, "date": "2026-10-23", "catego
           final amount = double.tryParse(parsed['amount']?.toString() ?? '0') ?? 0.0;
           final dateStr = parsed['date']?.toString();
           final categoryHint = parsed['category']?.toString().toLowerCase() ?? 'belanja';
-          final note = parsed['note']?.toString() ?? merchant;
+          // Aturan: note hanya berisi judul billing / merchant saja
+          final note = (parsed['note'] != null && parsed['note'].toString().trim().isNotEmpty)
+              ? parsed['note'].toString().trim()
+              : merchant;
 
           DateTime parsedDate = DateTime.now();
           if (dateStr != null) {
@@ -426,27 +439,33 @@ Contoh: {"merchant": "Indomaret", "amount": 45000, "date": "2026-10-23", "catego
           }
 
           final matchedCat = _matchCategory(categoryHint, categories);
-          final defaultWallet = wallets.isNotEmpty ? wallets.first.id : 'w_cash';
 
-          return {
-            'success': true,
-            'merchant': merchant,
-            'amount': amount,
-            'date': parsedDate,
-            'categoryId': matchedCat,
-            'walletId': defaultWallet,
-            'note': note,
-          };
+          if (amount > 0) {
+            return {
+              'success': true,
+              'merchant': merchant,
+              'amount': amount,
+              'date': parsedDate,
+              'categoryId': matchedCat,
+              'walletId': defaultWallet,
+              'note': note,
+            };
+          }
         }
       } catch (_) {
         // Fallback jika API gagal atau timeout
       }
     }
 
-    // Fallback offline / bila belum ada API key
-    final defaultCat = categories.isNotEmpty ? categories.first.id : 'cat_food';
-    final defaultWallet = wallets.isNotEmpty ? wallets.first.id : 'w_cash';
+    // 2. Offline OCR Engine (Windows Built-in OCR)
+    if (!kIsWeb && Platform.isWindows) {
+      final ocrResult = await _runWindowsOcr(imageBytes, filePath, categories, wallets);
+      if (ocrResult != null && (ocrResult['amount'] as double? ?? 0.0) > 0) {
+        return ocrResult;
+      }
+    }
 
+    // 3. Fallback default
     return {
       'success': true,
       'merchant': 'Struk Pembelian',
@@ -454,8 +473,222 @@ Contoh: {"merchant": "Indomaret", "amount": 45000, "date": "2026-10-23", "catego
       'date': DateTime.now(),
       'categoryId': defaultCat,
       'walletId': defaultWallet,
-      'note': 'Foto struk berhasil dimuat (Silakan sesuaikan nominal & pos dompet)',
+      'note': 'Struk Pembelian',
       'isFallback': true,
+    };
+  }
+
+  Future<Map<String, dynamic>?> _runWindowsOcr(
+    List<int> imageBytes,
+    String? filePath,
+    List<CategoryItem> categories,
+    List<Wallet> wallets,
+  ) async {
+    try {
+      File? tempFile;
+      String targetPath = filePath ?? '';
+      if (targetPath.isEmpty || !File(targetPath).existsSync()) {
+        final tempDir = Directory.systemTemp;
+        tempFile = File('${tempDir.path}/iritot_ocr_${DateTime.now().microsecondsSinceEpoch}.jpg');
+        await tempFile.writeAsBytes(imageBytes);
+        targetPath = tempFile.path;
+      }
+
+      final escapedPath = targetPath.replaceAll("'", "''");
+
+      final psScript = '''
+[System.Reflection.Assembly]::LoadWithPartialName("System.Runtime.WindowsRuntime") | Out-Null
+\$asTaskGeneric = [System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object { \$_.Name -eq 'AsTask' -and \$_.IsGenericMethod -and \$_.GetParameters().Count -eq 1 } | Select-Object -First 1
+
+function Await(\$winRtTask, \$targetType) {
+    \$global:asTaskGeneric.MakeGenericMethod(\$targetType).Invoke(\$null, @(\$winRtTask)).Result
+}
+
+[Windows.Media.Ocr.OcrEngine, Windows.Foundation.Metadata, ContentType = WindowsRuntime] | Out-Null
+[Windows.Graphics.Imaging.BitmapDecoder, Windows.Foundation.Metadata, ContentType = WindowsRuntime] | Out-Null
+[Windows.Storage.StorageFile, Windows.Foundation.Metadata, ContentType = WindowsRuntime] | Out-Null
+
+\$path = (Resolve-Path '$escapedPath').Path
+\$fileTask = [Windows.Storage.StorageFile]::GetFileFromPathAsync(\$path)
+\$file = Await \$fileTask ([Windows.Storage.StorageFile])
+
+\$streamTask = \$file.OpenAsync([Windows.Storage.FileAccessMode]::Read)
+\$stream = Await \$streamTask ([Windows.Storage.Streams.IRandomAccessStream])
+
+\$decoderTask = [Windows.Graphics.Imaging.BitmapDecoder]::CreateAsync(\$stream)
+\$decoder = Await \$decoderTask ([Windows.Graphics.Imaging.BitmapDecoder])
+
+\$bitmapTask = \$decoder.GetSoftwareBitmapAsync()
+\$bitmap = Await \$bitmapTask ([Windows.Graphics.Imaging.SoftwareBitmap])
+
+\$engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages()
+if (-not \$engine) { \$engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromLanguage([Windows.Globalization.Language]::new('en-US')) }
+
+\$ocrTask = \$engine.RecognizeAsync(\$bitmap)
+\$ocrResult = Await \$ocrTask ([Windows.Media.Ocr.OcrResult])
+
+foreach (\$line in \$ocrResult.Lines) {
+    Write-Output \$line.Text
+}
+''';
+
+      final res = await Process.run(
+        'powershell',
+        ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psScript],
+      );
+
+      if (tempFile != null && tempFile.existsSync()) {
+        try {
+          await tempFile.delete();
+        } catch (_) {}
+      }
+
+      if (res.exitCode == 0) {
+        final lines = LineSplitter.split(res.stdout.toString())
+            .map((l) => l.trim())
+            .where((l) => l.isNotEmpty)
+            .toList();
+
+        if (lines.isNotEmpty) {
+          return _parseReceiptOcrLines(lines, categories, wallets);
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Map<String, dynamic> _parseReceiptOcrLines(
+    List<String> lines,
+    List<CategoryItem> categories,
+    List<Wallet> wallets,
+  ) {
+    // 1. Ekstrak Judul / Merchant (Tittle Billing)
+    final ignoredTitlePatterns = RegExp(
+      r'^(npwp|rct|t\d+|tel|phone|pax|store|terminal|table|order|inv|date|waktu|jam|kasir|cashier|pos|receipt|bill|struk|jalan|jl\.|mall|floor|lantai|you have been)',
+      caseSensitive: false,
+    );
+
+    String title = 'Struk Belanja';
+    for (final rawLine in lines) {
+      final line = rawLine.trim();
+      if (line.isEmpty) continue;
+      final clean = line.replaceAll(RegExp(r'[^a-zA-Z0-9\s]'), '').trim();
+      if (clean.length >= 3 && !ignoredTitlePatterns.hasMatch(clean)) {
+        title = line;
+        break;
+      }
+    }
+
+    // 2. Ekstrak Tanggal Transaksi
+    DateTime parsedDate = DateTime.now();
+    final dateRegex = RegExp(r'(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})');
+    for (final line in lines) {
+      final m = dateRegex.firstMatch(line);
+      if (m != null) {
+        final day = int.tryParse(m.group(1)!) ?? 1;
+        final month = int.tryParse(m.group(2)!) ?? 1;
+        var year = int.tryParse(m.group(3)!) ?? DateTime.now().year;
+        if (year < 100) year += 2000;
+        if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+          parsedDate = DateTime(year, month, day);
+          break;
+        }
+      }
+    }
+
+    // 3. Ekstrak Total Nominal (Amount)
+    final ignoredNumberLinePrefixes = RegExp(
+      r'^(npwp|rct|t\d+|tel|phone|pax|store|terminal|table|order|inv|date|waktu|jam|invitation)',
+      caseSensitive: false,
+    );
+
+    final foundAmounts = <double>[];
+    double totalFromKeywordLine = 0.0;
+
+    for (var i = 0; i < lines.length; i++) {
+      final line = lines[i].trim();
+      if (ignoredNumberLinePrefixes.hasMatch(line)) continue;
+
+      final isTotalKeyword = RegExp(r'(total\s*tendered|grand\s*total|total\s*bayar|total\s*akhir|tagihan)', caseSensitive: false).hasMatch(line) ||
+          (RegExp(r'\btotal\b', caseSensitive: false).hasMatch(line) && !line.toLowerCase().contains('sub'));
+
+      final hasRp = RegExp(r'rp', caseSensitive: false).hasMatch(line);
+
+      // Normalisasi karakter angka yang sering salah terbaca OCR (misal: S -> 5, O/o -> 0 di dalam angka)
+      final lineFixed = line
+          .replaceAllMapped(RegExp(r'(?<=\d|[rR][pP])[\s]*[oO](?=\d|[\.,\s]|$)', caseSensitive: false), (m) => '0')
+          .replaceAllMapped(RegExp(r'(?<=\d)[\s]*[sS](?=\d|[\.,\s]|$)', caseSensitive: false), (m) => '5')
+          .replaceAllMapped(RegExp(r'(?<=\d)[\s]*[sS]$', caseSensitive: false), (m) => '5');
+
+      final matches = RegExp(r'(?:rp[\s\.]*)?([0-9]{1,3}(?:[,\.][0-9]{3})*(?:[,\.][0-9]{1,2})?|[0-9]{4,9})', caseSensitive: false).allMatches(lineFixed);
+
+      for (final m in matches) {
+        final raw = m.group(1);
+        if (raw == null) continue;
+
+        String cleaned = raw.replaceAll(' ', '');
+        if (cleaned.contains(',') && cleaned.contains('.')) {
+          cleaned = cleaned.replaceAll('.', '').replaceAll(',', '.');
+        } else if (cleaned.contains(',') || cleaned.contains('.')) {
+          final parts = cleaned.split(RegExp(r'[,\.]'));
+          if (parts.length == 2 && parts[1].length == 3) {
+            cleaned = parts[0] + parts[1];
+          } else if (parts.length > 2) {
+            cleaned = parts.join('');
+          } else if (parts.length == 2 && parts[1].length != 3) {
+            cleaned = cleaned.replaceAll(',', '.');
+          }
+        }
+
+        final val = double.tryParse(cleaned) ?? 0.0;
+        if (val >= 100 && val <= 100000000) {
+          if (hasRp || isTotalKeyword) {
+            foundAmounts.add(val);
+            if (isTotalKeyword && val > totalFromKeywordLine) {
+              totalFromKeywordLine = val;
+            }
+          }
+        }
+      }
+    }
+
+    double finalAmount = 0.0;
+    if (totalFromKeywordLine > 0) {
+      finalAmount = totalFromKeywordLine;
+    }
+    if (foundAmounts.isNotEmpty) {
+      foundAmounts.sort();
+      final maxAmount = foundAmounts.last;
+      if (maxAmount > finalAmount) {
+        finalAmount = maxAmount;
+      }
+    }
+
+    // 4. Kategori Otomatis
+    final fullText = lines.join(' ').toLowerCase();
+    String categoryHint = 'belanja';
+    if (fullText.contains('sushi') || fullText.contains('ramen') || fullText.contains('resto') || fullText.contains('dish') || fullText.contains('cafe') || fullText.contains('makan')) {
+      categoryHint = 'makanan';
+    } else if (fullText.contains('indomaret') || fullText.contains('alfamart') || fullText.contains('mart') || fullText.contains('supermarket')) {
+      categoryHint = 'belanja';
+    } else if (fullText.contains('pln') || fullText.contains('listrik') || fullText.contains('pdam') || fullText.contains('wifi') || fullText.contains('telkom')) {
+      categoryHint = 'tagihan';
+    } else if (fullText.contains('spbu') || fullText.contains('pertamina') || fullText.contains('bensin') || fullText.contains('shell')) {
+      categoryHint = 'transportasi';
+    }
+
+    final matchedCat = _matchCategory(categoryHint, categories);
+    final defaultWallet = wallets.isNotEmpty ? wallets.first.id : 'w_cash';
+
+    return {
+      'success': true,
+      'merchant': title,
+      'amount': finalAmount,
+      'date': parsedDate,
+      'categoryId': matchedCat,
+      'walletId': defaultWallet,
+      'note': title, // Aturan user: note nya isi dari tittle billing nya saja
+      'isOcr': true,
     };
   }
 
