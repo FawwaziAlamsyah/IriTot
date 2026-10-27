@@ -446,6 +446,7 @@ class _MainNavigationScaffoldState extends State<MainNavigationScaffold> {
       ReportsScreen(
         storageService: widget.storageService,
         localeService: widget.localeService,
+        onDataChanged: _onDataChanged,
       ),
       SettingsScreen(
         storageService: widget.storageService,
