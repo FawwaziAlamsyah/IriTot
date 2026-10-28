@@ -275,7 +275,7 @@ void main() {
     final ai = await AiService.init();
     final storage = await StorageService.init();
     final billingFile = File('contoh_billing.jpeg');
-    if (billingFile.existsSync()) {
+    if (billingFile.existsSync() && Platform.isWindows) {
       final bytes = await billingFile.readAsBytes();
       final res = await ai.analyzeReceiptImage(
         imageBytes: bytes,
@@ -288,7 +288,7 @@ void main() {
       expect(res['note'].toString().toUpperCase(), contains('SUSHIRO'));
       expect(res['merchant'].toString().toUpperCase(), contains('SUSHIRO'));
     }
-  });
+  }, skip: !Platform.isWindows ? 'Offline WinRT OCR is only supported on Windows' : null);
 
   test('Voice parser syncs with the user categories and wallets when spoken', () async {
     final ai = await AiService.init();

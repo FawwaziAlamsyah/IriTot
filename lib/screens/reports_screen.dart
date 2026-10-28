@@ -740,10 +740,15 @@ class _ReportsScreenState extends State<ReportsScreen> {
         Icon(icon, size: 16, color: color ?? AppTheme.textMuted),
         const SizedBox(width: 8),
         Text(label, style: const TextStyle(fontSize: 13, color: AppTheme.textMuted)),
-        const Spacer(),
-        Text(
-          value,
-          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: color ?? AppTheme.textPrimary),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: color ?? AppTheme.textPrimary),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
       ],
     );
