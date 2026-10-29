@@ -300,11 +300,48 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
       return;
     }
 
+    final isNoCategory = _selectedCategoryId == 'no_category' || _selectedCategoryId.isEmpty;
+
+    // Check if expense amount without category exceeds unallocated cash
+    if (_type == 'expense') {
+      final now = _selectedDate;
+      final totalCash = widget.storageService.getTotalBalance();
+      final existingBudgets = widget.storageService.getBudgets(now.month, now.year);
+      final totalMonthlyBudget = existingBudgets.fold(0.0, (sum, b) => sum + b.monthlyLimit);
+      final unallocatedCash = (totalCash - totalMonthlyBudget).clamp(0.0, double.infinity);
+
+      if (isNoCategory) {
+        if (amount > unallocatedCash) {
+          final fmtAvailable = ThousandsSeparatorInputFormatter.format(unallocatedCash);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '${t('errNonCategoryInsufficient')} (Rp $fmtAvailable). ${t('errPleaseSelectCategoryWithLimit')}',
+              ),
+              backgroundColor: AppTheme.coralRose,
+            ),
+          );
+          return;
+        }
+      } else {
+        final hasLimit = existingBudgets.any((b) => b.categoryId == _selectedCategoryId && b.monthlyLimit > 0);
+        if (amount > unallocatedCash && !hasLimit) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(t('errCategoryHasNoLimit')),
+              backgroundColor: AppTheme.coralRose,
+            ),
+          );
+          return;
+        }
+      }
+    }
+
     final item = TransactionItem(
       id: const Uuid().v4(),
       walletId: _selectedWalletId,
       destinationWalletId: _type == 'transfer' ? _selectedDestWalletId : null,
-      categoryId: _type == 'transfer' ? 'cat_transfer' : _selectedCategoryId,
+      categoryId: isNoCategory ? (_type == 'transfer' ? 'cat_transfer' : 'no_category') : _selectedCategoryId,
       type: _type,
       amount: amount,
       note: _noteController.text.trim().isEmpty
@@ -322,10 +359,12 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
 
   @override
   Widget build(BuildContext context) {
-    final filteredCategories = _categories.where((c) => c.type == _type).toList();
     final isExpense = _type == 'expense';
     final isIncome = _type == 'income';
     final isTransfer = _type == 'transfer';
+    final filteredCategories = isTransfer
+        ? _categories
+        : _categories.where((c) => c.type == _type).toList();
 
     return Container(
       decoration: const BoxDecoration(
@@ -651,51 +690,82 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
             ),
             const SizedBox(height: 18),
 
-            // Category Selection (Only if not transfer)
-            if (!isTransfer) ...[
-              Text(
-                t('addTxCategory'),
-                style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                height: 40,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: filteredCategories.length,
-                  separatorBuilder: (context, index) => const SizedBox(width: 8),
-                  itemBuilder: (context, index) {
-                    final cat = filteredCategories[index];
-                    final isSelected = cat.id == _selectedCategoryId;
+            // Category Selection (Optional: with "Tanpa Kategori")
+            Text(
+              t('addTxCategory'),
+              style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 40,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: filteredCategories.length + 1,
+                separatorBuilder: (context, index) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  if (index == 0) {
+                    final isSelected = _selectedCategoryId == 'no_category' || _selectedCategoryId.isEmpty;
                     return GestureDetector(
-                      onTap: () => setState(() => _selectedCategoryId = cat.id),
+                      onTap: () => setState(() => _selectedCategoryId = 'no_category'),
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                         decoration: BoxDecoration(
-                          color: isSelected ? Color(cat.colorValue).withValues(alpha: 0.2) : AppTheme.surfaceLighter,
+                          color: isSelected ? AppTheme.cyanAccent.withValues(alpha: 0.2) : AppTheme.surfaceLighter,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: isSelected ? Color(cat.colorValue) : AppTheme.borderDark,
+                            color: isSelected ? AppTheme.cyanAccent : AppTheme.borderDark,
                             width: isSelected ? 1.5 : 1,
                           ),
                         ),
-                        child: Center(
-                          child: Text(
-                            cat.name,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                              color: isSelected ? Color(cat.colorValue) : AppTheme.textSecondary,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.label_off_outlined, size: 14, color: isSelected ? AppTheme.cyanAccent : AppTheme.textSecondary),
+                            const SizedBox(width: 6),
+                            Text(
+                              t('noCategory'),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                color: isSelected ? AppTheme.cyanAccent : AppTheme.textSecondary,
+                              ),
                             ),
-                          ),
+                          ],
                         ),
                       ),
                     );
-                  },
-                ),
+                  }
+
+                  final cat = filteredCategories[index - 1];
+                  final isSelected = cat.id == _selectedCategoryId;
+                  return GestureDetector(
+                    onTap: () => setState(() => _selectedCategoryId = isSelected ? 'no_category' : cat.id),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isSelected ? Color(cat.colorValue).withValues(alpha: 0.2) : AppTheme.surfaceLighter,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isSelected ? Color(cat.colorValue) : AppTheme.borderDark,
+                          width: isSelected ? 1.5 : 1,
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          cat.name,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                            color: isSelected ? Color(cat.colorValue) : AppTheme.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
-              const SizedBox(height: 18),
-            ],
+            ),
+            const SizedBox(height: 18),
 
             // Note Input
             Text(
@@ -759,9 +829,15 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
         onTap: () {
           setState(() {
             _type = type;
-            final newCats = _categories.where((c) => c.type == type).toList();
-            if (newCats.isNotEmpty) {
-              _selectedCategoryId = newCats.first.id;
+            if (type == 'transfer') {
+              _selectedCategoryId = 'no_category';
+            } else {
+              final newCats = _categories.where((c) => c.type == type).toList();
+              if (newCats.isNotEmpty) {
+                _selectedCategoryId = newCats.first.id;
+              } else {
+                _selectedCategoryId = 'no_category';
+              }
             }
           });
         },

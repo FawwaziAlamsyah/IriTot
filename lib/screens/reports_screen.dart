@@ -512,6 +512,15 @@ class _ReportsScreenState extends State<ReportsScreen> {
   // --- Deletion & Modals ---
 
   Future<void> _confirmDeleteTransaction(TransactionItem t) async {
+    if (!widget.storageService.canDeleteTransaction(t)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_t('errTxCannotDelete7Days')),
+          backgroundColor: AppTheme.coralRose,
+        ),
+      );
+      return;
+    }
     final confirm = await showDialog<bool>(
       context: context,
       builder: (dialogCtx) => AlertDialog(
@@ -704,23 +713,47 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   ],
                 ),
                 const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppTheme.coralRose,
-                      side: const BorderSide(color: AppTheme.coralRose),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                if (widget.storageService.canDeleteTransaction(t)) ...[
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.coralRose,
+                        side: const BorderSide(color: AppTheme.coralRose),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      icon: const Icon(Icons.delete_outline, size: 18),
+                      label: Text(_t('deleteTransactionTitle'), style: const TextStyle(fontWeight: FontWeight.w700)),
+                      onPressed: () {
+                        Navigator.pop(modalCtx);
+                        _confirmDeleteTransaction(t);
+                      },
                     ),
-                    icon: const Icon(Icons.delete_outline, size: 18),
-                    label: Text(_t('deleteTransactionTitle'), style: const TextStyle(fontWeight: FontWeight.w700)),
-                    onPressed: () {
-                      Navigator.pop(modalCtx);
-                      _confirmDeleteTransaction(t);
-                    },
                   ),
-                ),
+                ] else ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surfaceLighter,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppTheme.borderDark),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.info_outline, size: 16, color: AppTheme.textMuted),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _t('errTxCannotDelete7Days'),
+                            style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

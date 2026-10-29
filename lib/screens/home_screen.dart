@@ -108,6 +108,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   void _confirmDeleteTransaction(TransactionItem t) {
+    if (!widget.storageService.canDeleteTransaction(t)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(widget.localeService?.t('errTxCannotDelete7Days') ?? 'Transaksi lebih dari 7 hari tidak dapat dihapus.'),
+          backgroundColor: AppTheme.coralRose,
+        ),
+      );
+      return;
+    }
     showDialog(
       context: context,
       builder: (dialogCtx) => AlertDialog(
@@ -887,6 +896,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   key: Key(t.id),
                   direction: DismissDirection.endToStart,
                   confirmDismiss: (_) async {
+                    if (!widget.storageService.canDeleteTransaction(t)) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(widget.localeService?.t('errTxCannotDelete7Days') ?? 'Transaksi lebih dari 7 hari tidak dapat dihapus.'),
+                          backgroundColor: AppTheme.coralRose,
+                        ),
+                      );
+                      return false;
+                    }
                     bool confirm = false;
                     await showDialog(
                       context: context,

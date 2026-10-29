@@ -281,6 +281,17 @@ class StorageService {
 
     if (item.type == 'expense') {
       wallet.balance -= item.amount;
+      if (item.categoryId.isNotEmpty &&
+          item.categoryId != 'no_category' &&
+          item.categoryId != 'cat_transfer') {
+        final now = item.date;
+        final allBudgets = getBudgets(now.month, now.year);
+        final bIdx = allBudgets.indexWhere((b) => b.categoryId == item.categoryId);
+        if (bIdx != -1) {
+          final newLimit = (allBudgets[bIdx].monthlyLimit - item.amount).clamp(0.0, double.infinity);
+          await setBudget(item.categoryId, newLimit, now.month, now.year);
+        }
+      }
     } else if (item.type == 'income') {
       wallet.balance += item.amount;
     } else if (item.type == 'transfer' && item.destinationWalletId != null) {
@@ -361,12 +372,21 @@ class StorageService {
     return toAdd.length;
   }
 
-  Future<void> deleteTransaction(String id) async {
+  bool canDeleteTransaction(TransactionItem item) {
+    final diff = DateTime.now().difference(item.date);
+    return diff.inDays <= 7;
+  }
+
+  Future<bool> deleteTransaction(String id) async {
     final transactions = getTransactions();
     final index = transactions.indexWhere((t) => t.id == id);
-    if (index == -1) return;
+    if (index == -1) return false;
 
     final item = transactions[index];
+    if (!canDeleteTransaction(item)) {
+      return false;
+    }
+
     final wallets = getWallets();
     final wallet = wallets.firstWhere(
       (w) => w.id == item.walletId,
@@ -376,6 +396,17 @@ class StorageService {
     // Revert balance
     if (item.type == 'expense') {
       wallet.balance += item.amount;
+      if (item.categoryId.isNotEmpty &&
+          item.categoryId != 'no_category' &&
+          item.categoryId != 'cat_transfer') {
+        final now = item.date;
+        final allBudgets = getBudgets(now.month, now.year);
+        final bIdx = allBudgets.indexWhere((b) => b.categoryId == item.categoryId);
+        if (bIdx != -1) {
+          final newLimit = allBudgets[bIdx].monthlyLimit + item.amount;
+          await setBudget(item.categoryId, newLimit, now.month, now.year);
+        }
+      }
     } else if (item.type == 'income') {
       wallet.balance -= item.amount;
     } else if (item.type == 'transfer' && item.destinationWalletId != null) {
@@ -390,6 +421,7 @@ class StorageService {
     transactions.removeAt(index);
     await saveTransactions(transactions);
     await saveWallets(wallets);
+    return true;
   }
 
   double getTotalBalance() {

@@ -404,28 +404,15 @@ class _BudgetScreenState extends State<BudgetScreen> {
         .getBudgets(now.month, now.year)
         .where((b) => expenseCatIds.contains(b.categoryId))
         .toList();
-    final transactions = widget.storageService.getTransactions().where(
-          (t) => t.type == 'expense' &&
-                 expenseCatIds.contains(t.categoryId) &&
-                 t.date.month == now.month &&
-                 t.date.year == now.year,
-        ).toList();
 
     final budgetMap = {for (var b in budgets) b.categoryId: b.monthlyLimit};
     final totalCash = widget.storageService.getTotalBalance();
 
     double totalBudget = 0.0;
-    double totalSpent = 0.0;
-
     for (final c in categories) {
       final limit = budgetMap[c.id] ?? 0.0;
       totalBudget += limit;
-      final spent = transactions.where((t) => t.categoryId == c.id).fold(0.0, (sum, t) => sum + t.amount);
-      totalSpent += spent;
     }
-
-    final overallRatio = totalBudget > 0 ? (totalSpent / totalBudget).clamp(0.0, 1.0) : 0.0;
-    final overallPercent = totalBudget > 0 ? ((totalSpent / totalBudget) * 100).toInt() : 0;
 
     final body = SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -447,57 +434,14 @@ class _BudgetScreenState extends State<BudgetScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      t('totalBudgetThisMonth'),
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.textMuted, letterSpacing: 0.8),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: overallPercent >= 80 ? AppTheme.coralRose.withValues(alpha: 0.2) : AppTheme.emeraldGreen.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        '$overallPercent% ${t('used')}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: overallPercent >= 80 ? AppTheme.coralRose : AppTheme.emeraldGreen,
-                        ),
-                      ),
-                    ),
-                  ],
+                Text(
+                  t('totalBudgetThisMonth'),
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.textMuted, letterSpacing: 0.8),
                 ),
-                const SizedBox(height: 10),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: [
-                    Text(
-                      _currencyFormat.format(totalSpent),
-                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: AppTheme.textPrimary),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '/ ${_currencyFormat.format(totalBudget)}',
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textMuted),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(5),
-                  child: LinearProgressIndicator(
-                    value: overallRatio,
-                    backgroundColor: AppTheme.surfaceLighter,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      overallPercent >= 80 ? AppTheme.coralRose : AppTheme.emeraldGreen,
-                    ),
-                    minHeight: 8,
-                  ),
+                const SizedBox(height: 8),
+                Text(
+                  _currencyFormat.format(totalBudget),
+                  style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: AppTheme.textPrimary),
                 ),
                 const SizedBox(height: 14),
                 Container(
@@ -595,10 +539,6 @@ class _BudgetScreenState extends State<BudgetScreen> {
               itemBuilder: (context, index) {
                 final cat = categories[index];
                 final limit = budgetMap[cat.id] ?? 0.0;
-                final spent = transactions.where((t) => t.categoryId == cat.id).fold(0.0, (sum, t) => sum + t.amount);
-                final ratio = limit > 0 ? (spent / limit).clamp(0.0, 1.0) : 0.0;
-                final percent = limit > 0 ? ((spent / limit) * 100).toInt() : 0;
-                final isWarning = percent >= 80;
 
                 return GestureDetector(
                   onTap: () => _showSetBudgetDialog(cat, limit),
@@ -632,65 +572,40 @@ class _BudgetScreenState extends State<BudgetScreen> {
                                 ),
                               ],
                             ),
-                            Row(
-                              children: [
-                                Text(
-                                  limit > 0 ? '$percent%' : t('notSet'),
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: limit > 0 ? (isWarning ? AppTheme.coralRose : AppTheme.emeraldGreen) : AppTheme.textMuted,
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: AppTheme.surfaceLighter,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: AppTheme.borderDark),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(limit > 0 ? Icons.edit_outlined : Icons.add, size: 11, color: AppTheme.textSecondary),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    limit > 0 ? t('edit') : t('add'),
+                                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
                                   ),
-                                ),
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.surfaceLighter,
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: AppTheme.borderDark),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(limit > 0 ? Icons.edit_outlined : Icons.add, size: 11, color: AppTheme.textSecondary),
-                                      const SizedBox(width: 3),
-                                      Text(
-                                        limit > 0 ? t('edit') : t('add'),
-                                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 10),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              '${t('spent')}: ${_currencyFormat.format(spent)}',
-                              style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
-                            ),
-                            Text(
-                              '${t('limit')}: ${_currencyFormat.format(limit)}',
-                              style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                              limit > 0 ? '${t('limit')}: ${_currencyFormat.format(limit)}' : t('notSet'),
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: limit > 0 ? AppTheme.textPrimary : AppTheme.textMuted,
+                              ),
                             ),
                           ],
-                        ),
-                        const SizedBox(height: 8),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(3),
-                          child: LinearProgressIndicator(
-                            value: ratio,
-                            backgroundColor: AppTheme.surfaceLighter,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              isWarning ? AppTheme.coralRose : Color(cat.colorValue),
-                            ),
-                            minHeight: 5,
-                          ),
                         ),
                       ],
                     ),

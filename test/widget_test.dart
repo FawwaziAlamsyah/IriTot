@@ -9,11 +9,13 @@ import 'package:iritot/services/auth_service.dart';
 import 'package:iritot/services/locale_service.dart';
 import 'package:iritot/models/savings_pocket.dart';
 import 'package:iritot/models/wallet.dart';
+import 'package:iritot/models/transaction_item.dart';
 import 'package:iritot/screens/splash_screen.dart';
 import 'package:iritot/screens/login_screen.dart';
 import 'package:iritot/screens/savings_screen.dart';
 import 'package:iritot/screens/budget_screen.dart';
 import 'package:iritot/screens/settings_screen.dart';
+import 'package:iritot/screens/add_transaction_modal.dart';
 
 void main() {
   testWidgets('IriTot Login flow and Savings navigation smoke test', (WidgetTester tester) async {
@@ -545,7 +547,119 @@ void main() {
     // Alokasi Tabungan should NOT be in the budget category list
     expect(find.text('Alokasi Tabungan'), findsNothing);
 
-    // Total spent in Monthly Budget should be Rp 0 (pocket deposit is not an expense budget item)
-    expect(find.text('0% Used'), findsOneWidget);
+    // Spent info is removed from Monthly Budget; only limit is displayed
+    expect(find.text('0% Used'), findsNothing);
+    expect(find.text('Rp 1.500.000'), findsWidgets);
+  });
+
+  testWidgets('Expense reduces category limit directly and AddTransaction allows no category with unallocated cash check', (WidgetTester tester) async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    SharedPreferences.setMockInitialValues({});
+
+    final storage = await StorageService.init();
+    final locale = await LocaleService.init();
+    final now = DateTime.now();
+
+    // Setup initial wallet balance: 1.000.000
+    final wallet = storage.getWallets().first;
+    wallet.balance = 1000000;
+    await storage.saveWallets([wallet]);
+
+    // Setup category budget for Food: 400.000
+    await storage.setBudget('cat_food', 400000, now.month, now.year);
+    // Unallocated cash = 1.000.000 - 400.000 = 600.000
+
+    // Task 1: Expense with category reduces its limit directly
+    await storage.addTransaction(TransactionItem(
+      id: 'tx_food_exp_1',
+      walletId: wallet.id,
+      categoryId: 'cat_food',
+      type: 'expense',
+      amount: 150000,
+      note: 'Makan siang restoran',
+      date: now,
+    ));
+
+    // Category limit should be reduced from 400.000 to 250.000
+    final budgetsAfterExp = storage.getBudgets(now.month, now.year);
+    final foodBudget = budgetsAfterExp.firstWhere((b) => b.categoryId == 'cat_food');
+    expect(foodBudget.monthlyLimit, 250000);
+
+    // Deleting the transaction restores the limit
+    await storage.deleteTransaction('tx_food_exp_1');
+    final budgetsAfterDelete = storage.getBudgets(now.month, now.year);
+    expect(budgetsAfterDelete.firstWhere((b) => b.categoryId == 'cat_food').monthlyLimit, 400000);
+
+    // Task 2: AddTransactionModal allows transactions without category
+    final ai = await AiService.init();
+    await tester.pumpWidget(MaterialApp(
+      home: Builder(
+        builder: (ctx) => Scaffold(
+          body: ElevatedButton(
+            onPressed: () {
+              showModalBottomSheet(
+                context: ctx,
+                isScrollControlled: true,
+                builder: (_) => AddTransactionModal(
+                  storageService: storage,
+                  aiService: ai,
+                  localeService: locale,
+                  onTransactionAdded: () {},
+                ),
+              );
+            },
+            child: const Text('Open Modal'),
+          ),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    // Open modal
+    await tester.tap(find.text('Open Modal'));
+    await tester.pumpAndSettle();
+
+    // Verify "No Category" / "Tanpa Kategori" option is rendered
+    expect(find.text('No Category'), findsOneWidget);
+
+    // Enter amount: 200.000 (less than unallocated cash 600.000)
+    final amountField = find.byType(TextField).first;
+    await tester.enterText(amountField, '200000');
+    await tester.pumpAndSettle();
+
+    // Select "No Category"
+    await tester.tap(find.text('No Category'));
+    await tester.pumpAndSettle();
+
+    // Save transaction without category
+    await tester.ensureVisible(find.text('Save Expense'));
+    await tester.tap(find.text('Save Expense'));
+    await tester.pumpAndSettle();
+
+    // Verify transaction was saved with 'no_category'
+    final txs = storage.getTransactions();
+    expect(txs.any((t) => t.categoryId == 'no_category' && t.amount == 200000), isTrue);
+
+    // Now test check: when amount > unallocated cash, no-category expense is blocked
+    // Current wallet cash: 800.000, total monthly budget: 400.000, unallocated cash = 400.000
+    await tester.tap(find.text('Open Modal'));
+    await tester.pumpAndSettle();
+
+    // Enter amount 500.000 (exceeds unallocated cash 400.000)
+    await tester.enterText(find.byType(TextField).first, '500000');
+    await tester.pumpAndSettle();
+
+    // Tap No Category
+    await tester.tap(find.text('No Category'));
+    await tester.pumpAndSettle();
+
+    // Try to save
+    await tester.ensureVisible(find.text('Save Expense'));
+    await tester.tap(find.text('Save Expense'));
+    await tester.pumpAndSettle();
+
+    // Expect error snackbar informing that non-category funds are insufficient
+    expect(find.textContaining('Non-category funds insufficient'), findsOneWidget);
+    expect(find.textContaining('Non-category funds insufficient'), findsOneWidget);
   });
 }

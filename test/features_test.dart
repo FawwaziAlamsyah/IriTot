@@ -593,4 +593,41 @@ rec_3,2026-03-01 12:00:00,Krom,in,20000000,THR,20000000
     expect(walletAfter.type, 'bank');
     expect(walletAfter.balance, 10000000);
   });
+
+  test('Transactions older than 7 days cannot be deleted', () async {
+    final storage = await StorageService.init();
+    final now = DateTime.now();
+
+    // 1. Transaction 3 days old (<= 7 days) can be deleted
+    final recentTx = TransactionItem(
+      id: 'tx_recent',
+      walletId: 'w_cash',
+      categoryId: 'cat_food',
+      type: 'expense',
+      amount: 50000,
+      note: 'Makan siang 3 hari lalu',
+      date: now.subtract(const Duration(days: 3)),
+    );
+    await storage.addTransaction(recentTx);
+    expect(storage.canDeleteTransaction(recentTx), isTrue);
+    final deleteRecentSuccess = await storage.deleteTransaction('tx_recent');
+    expect(deleteRecentSuccess, isTrue);
+    expect(storage.getTransactions().any((t) => t.id == 'tx_recent'), isFalse);
+
+    // 2. Transaction 10 days old (> 7 days) cannot be deleted
+    final oldTx = TransactionItem(
+      id: 'tx_old_10_days',
+      walletId: 'w_cash',
+      categoryId: 'cat_food',
+      type: 'expense',
+      amount: 100000,
+      note: 'Makan siang 10 hari lalu',
+      date: now.subtract(const Duration(days: 10)),
+    );
+    await storage.addTransaction(oldTx);
+    expect(storage.canDeleteTransaction(oldTx), isFalse);
+    final deleteOldSuccess = await storage.deleteTransaction('tx_old_10_days');
+    expect(deleteOldSuccess, isFalse);
+    expect(storage.getTransactions().any((t) => t.id == 'tx_old_10_days'), isTrue);
+  });
 }
