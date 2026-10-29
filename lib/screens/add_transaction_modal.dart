@@ -288,15 +288,67 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
     _amountController.text = ThousandsSeparatorInputFormatter.format(updated);
   }
 
+  void _showValidationAlert(String message, {String? title}) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          backgroundColor: AppTheme.surfaceDark,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+            side: const BorderSide(color: AppTheme.borderDark),
+          ),
+          title: Row(
+            children: [
+              const Icon(Icons.warning_amber_rounded, color: AppTheme.coralRose, size: 22),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  title ?? t('notice'),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            message,
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppTheme.textSecondary,
+              height: 1.4,
+            ),
+          ),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.emeraldGreen,
+                foregroundColor: Colors.black,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
+              ),
+              child: Text(t('ok'), style: const TextStyle(fontWeight: FontWeight.w700)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _saveTransaction() async {
     final amount = ThousandsSeparatorInputFormatter.parse(_amountController.text);
     if (amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(t('addTxErrAmount')),
-          backgroundColor: AppTheme.coralRose,
-        ),
-      );
+      _showValidationAlert(t('addTxErrAmount'));
+      return;
+    }
+
+    if (_type == 'transfer' && _selectedWalletId == _selectedDestWalletId) {
+      _showValidationAlert(t('errSameWallet'));
       return;
     }
 
@@ -313,25 +365,15 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
       if (isNoCategory) {
         if (amount > unallocatedCash) {
           final fmtAvailable = ThousandsSeparatorInputFormatter.format(unallocatedCash);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                '${t('errNonCategoryInsufficient')} (Rp $fmtAvailable). ${t('errPleaseSelectCategoryWithLimit')}',
-              ),
-              backgroundColor: AppTheme.coralRose,
-            ),
+          _showValidationAlert(
+            '${t('errNonCategoryInsufficient')} (Rp $fmtAvailable). ${t('errPleaseSelectCategoryWithLimit')}',
           );
           return;
         }
       } else {
         final hasLimit = existingBudgets.any((b) => b.categoryId == _selectedCategoryId && b.monthlyLimit > 0);
         if (amount > unallocatedCash && !hasLimit) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(t('errCategoryHasNoLimit')),
-              backgroundColor: AppTheme.coralRose,
-            ),
-          );
+          _showValidationAlert(t('errCategoryHasNoLimit'));
           return;
         }
       }

@@ -86,20 +86,40 @@ class _BudgetScreenState extends State<BudgetScreen> {
                 borderRadius: BorderRadius.circular(20),
                 side: const BorderSide(color: AppTheme.borderDark),
               ),
+              titlePadding: const EdgeInsets.fromLTRB(18, 16, 12, 0),
+              contentPadding: const EdgeInsets.fromLTRB(18, 12, 18, 8),
+              actionsPadding: const EdgeInsets.fromLTRB(18, 0, 18, 14),
               title: Row(
                 children: [
                   Icon(
                     isEditing ? Icons.edit_note_rounded : Icons.add_circle_outline,
                     color: isEditing ? AppTheme.cyanAccent : AppTheme.emeraldGreen,
-                    size: 22,
+                    size: 20,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       isEditing ? '${t('editBudget')}: ${selectedCategory.name}' : t('addBudget'),
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  if (limitVal > 0)
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline_rounded, color: AppTheme.coralRose, size: 20),
+                      tooltip: t('deleteBudget'),
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () async {
+                        final navigator = Navigator.of(dialogContext);
+                        await widget.storageService.deleteBudget(selectedCategory.id, now.month, now.year);
+                        if (mounted) {
+                          setState(() {});
+                          widget.onDataChanged();
+                        }
+                        navigator.pop();
+                      },
+                    ),
                 ],
               ),
               content: SingleChildScrollView(
@@ -241,6 +261,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
                       controller: controller,
                       keyboardType: TextInputType.number,
                       inputFormatters: [ThousandsSeparatorInputFormatter()],
+                      scrollPadding: const EdgeInsets.all(80),
                       onChanged: (_) => setDialogState(() {}),
                       style: TextStyle(
                         color: isOverCash ? AppTheme.coralRose : AppTheme.textPrimary,
@@ -326,62 +347,74 @@ class _BudgetScreenState extends State<BudgetScreen> {
                 ),
               ),
               actions: [
-                if (limitVal > 0)
-                  TextButton(
-                    onPressed: () async {
-                      final navigator = Navigator.of(dialogContext);
-                      await widget.storageService.deleteBudget(selectedCategory.id, now.month, now.year);
-                      if (mounted) {
-                        setState(() {});
-                        widget.onDataChanged();
-                      }
-                      navigator.pop();
-                    },
-                    child: Text(t('deleteBudget'), style: const TextStyle(color: AppTheme.coralRose, fontWeight: FontWeight.w600)),
-                  ),
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  child: Text(t('cancel'), style: const TextStyle(color: AppTheme.textMuted)),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    final limit = ThousandsSeparatorInputFormatter.parse(controller.text);
-                    if (limit > effectiveMax && totalCash > 0) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            '${t('errBudgetExceedsCash')} (${widget.localeService?.isIndonesian == true ? 'Maks' : 'Max'}: ${_currencyFormat.format(effectiveMax)})',
+                Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 38,
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(dialogContext),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: AppTheme.borderDark),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            padding: EdgeInsets.zero,
                           ),
-                          backgroundColor: AppTheme.coralRose,
+                          child: Text(
+                            t('cancel'),
+                            style: const TextStyle(color: AppTheme.textMuted, fontSize: 13, fontWeight: FontWeight.w600),
+                          ),
                         ),
-                      );
-                      return;
-                    }
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: SizedBox(
+                        height: 38,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            final limit = ThousandsSeparatorInputFormatter.parse(controller.text);
+                            if (limit > effectiveMax && totalCash > 0) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    '${t('errBudgetExceedsCash')} (${widget.localeService?.isIndonesian == true ? 'Maks' : 'Max'}: ${_currencyFormat.format(effectiveMax)})',
+                                  ),
+                                  backgroundColor: AppTheme.coralRose,
+                                ),
+                              );
+                              return;
+                            }
 
-                    final navigator = Navigator.of(dialogContext);
-                    if (limit <= 0) {
-                      await widget.storageService.deleteBudget(selectedCategory.id, now.month, now.year);
-                    } else {
-                      await widget.storageService.setBudget(selectedCategory.id, limit, now.month, now.year);
-                    }
-                    if (mounted) {
-                      setState(() {});
-                      widget.onDataChanged();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(t('budgetSavedSuccess')),
-                          backgroundColor: AppTheme.emeraldGreen,
-                          duration: const Duration(seconds: 2),
+                            final navigator = Navigator.of(dialogContext);
+                            if (limit <= 0) {
+                              await widget.storageService.deleteBudget(selectedCategory.id, now.month, now.year);
+                            } else {
+                              await widget.storageService.setBudget(selectedCategory.id, limit, now.month, now.year);
+                            }
+                            if (mounted) {
+                              setState(() {});
+                              widget.onDataChanged();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(t('budgetSavedSuccess')),
+                                  backgroundColor: AppTheme.emeraldGreen,
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            }
+                            navigator.pop();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.emeraldGreen,
+                            foregroundColor: Colors.black,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            padding: EdgeInsets.zero,
+                          ),
+                          child: Text(t('save'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
                         ),
-                      );
-                    }
-                    navigator.pop();
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.emeraldGreen,
-                    foregroundColor: Colors.black,
-                  ),
-                  child: Text(t('save'), style: const TextStyle(fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             );

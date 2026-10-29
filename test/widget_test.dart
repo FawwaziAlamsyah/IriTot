@@ -658,8 +658,106 @@ void main() {
     await tester.tap(find.text('Save Expense'));
     await tester.pumpAndSettle();
 
-    // Expect error snackbar informing that non-category funds are insufficient
+    // Expect error popup dialog informing that non-category funds are insufficient
     expect(find.textContaining('Non-category funds insufficient'), findsOneWidget);
-    expect(find.textContaining('Non-category funds insufficient'), findsOneWidget);
+    // Pop message has 'OK' button
+    expect(find.text('OK'), findsOneWidget);
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    expect(find.text('OK'), findsNothing);
+  });
+
+  testWidgets('AddTransactionModal shows pop message alert on validation and BudgetScreen edit dialog buttons are compact', (WidgetTester tester) async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    SharedPreferences.setMockInitialValues({});
+
+    final storage = await StorageService.init();
+    final locale = await LocaleService.init();
+    final ai = await AiService.init();
+
+    // 1. Test validation alert in AddTransactionModal when amount is 0
+    await tester.pumpWidget(MaterialApp(
+      home: Builder(
+        builder: (ctx) => Scaffold(
+          body: ElevatedButton(
+            onPressed: () {
+              showModalBottomSheet(
+                context: ctx,
+                isScrollControlled: true,
+                builder: (_) => AddTransactionModal(
+                  storageService: storage,
+                  aiService: ai,
+                  localeService: locale,
+                  onTransactionAdded: () {},
+                ),
+              );
+            },
+            child: const Text('Open Modal'),
+          ),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Open Modal'));
+    await tester.pumpAndSettle();
+
+    // Tap Save Expense with 0 amount
+    await tester.ensureVisible(find.text('Save Expense'));
+    await tester.tap(find.text('Save Expense'));
+    await tester.pumpAndSettle();
+
+    // Verify pop message with Notice and OK button
+    expect(find.text('Notice'), findsOneWidget);
+    expect(find.text('Please enter a valid transaction amount.'), findsOneWidget);
+    expect(find.text('OK'), findsOneWidget);
+
+    // Tap OK dismisses popup dialog
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    expect(find.text('Notice'), findsNothing);
+
+    // Close modal bottom sheet
+    await tester.tapAt(const Offset(20, 20));
+    await tester.pumpAndSettle();
+
+    // 2. Test BudgetScreen edit dialog compact buttons layout
+    final now = DateTime.now();
+    await storage.setBudget('cat_food', 500000, now.month, now.year);
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: BudgetScreen(
+          storageService: storage,
+          localeService: locale,
+          onDataChanged: () {},
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    // Scroll and tap Food budget card to open edit dialog
+    expect(find.text('Makan & Minum'), findsWidgets);
+    await tester.ensureVisible(find.text('Makan & Minum').first);
+    await tester.tap(find.text('Makan & Minum').first);
+    await tester.pumpAndSettle();
+
+    // Verify Edit Budget dialog is opened
+    expect(find.textContaining('Edit Budget'), findsOneWidget);
+
+    // Verify compact actions: Cancel and Save exist
+    expect(find.text('Cancel'), findsOneWidget);
+    expect(find.text('Save'), findsOneWidget);
+
+    // Verify header delete icon button exists
+    expect(find.byIcon(Icons.delete_outline_rounded), findsOneWidget);
+
+    // Verify old large text button 'Delete Budget' is not in actions
+    expect(find.text('Delete Budget'), findsNothing);
+
+    // Tap Cancel closes dialog
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Edit Budget'), findsNothing);
   });
 }
