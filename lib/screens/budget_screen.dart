@@ -73,12 +73,12 @@ class _BudgetScreenState extends State<BudgetScreen> {
         return StatefulBuilder(
           builder: (ctx, setDialogState) {
             final isEditing = limitVal > 0;
-            final otherBudgetsTotal = existingBudgets
-                .where((b) => b.categoryId != selectedCategory.id)
+            final totalMonthlyBudget = existingBudgets
                 .fold(0.0, (sum, b) => sum + b.monthlyLimit);
-            final maxSafeBudget = (totalCash - otherBudgetsTotal).clamp(0.0, double.infinity);
+            final maxSafeBudget = (totalCash - totalMonthlyBudget).clamp(0.0, double.infinity);
             final enteredAmount = ThousandsSeparatorInputFormatter.parse(controller.text);
-            final isOverCash = enteredAmount > maxSafeBudget;
+            final effectiveMax = isEditing ? (limitVal + maxSafeBudget) : maxSafeBudget;
+            final isOverCash = enteredAmount > effectiveMax;
 
             return AlertDialog(
               backgroundColor: AppTheme.surfaceDark,
@@ -269,7 +269,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
-                              '${t('errBudgetExceedsCash')} (${widget.localeService?.isIndonesian == true ? 'Maks' : 'Max'}: ${_currencyFormat.format(maxSafeBudget)})',
+                              '${t('errBudgetExceedsCash')} (${widget.localeService?.isIndonesian == true ? 'Maks' : 'Max'}: ${_currencyFormat.format(effectiveMax)})',
                               style: const TextStyle(fontSize: 11, color: AppTheme.coralRose, fontWeight: FontWeight.w600),
                             ),
                           ),
@@ -294,7 +294,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                 onPressed: () {
                                   setDialogState(() {
-                                    controller.text = ThousandsSeparatorInputFormatter.format(maxSafeBudget);
+                                    controller.text = ThousandsSeparatorInputFormatter.format(effectiveMax);
                                   });
                                 },
                               ),
@@ -346,11 +346,11 @@ class _BudgetScreenState extends State<BudgetScreen> {
                 ElevatedButton(
                   onPressed: () async {
                     final limit = ThousandsSeparatorInputFormatter.parse(controller.text);
-                    if (limit > maxSafeBudget && totalCash > 0) {
+                    if (limit > effectiveMax && totalCash > 0) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
-                            '${t('errBudgetExceedsCash')} (${widget.localeService?.isIndonesian == true ? 'Maks' : 'Max'}: ${_currencyFormat.format(maxSafeBudget)})',
+                            '${t('errBudgetExceedsCash')} (${widget.localeService?.isIndonesian == true ? 'Maks' : 'Max'}: ${_currencyFormat.format(effectiveMax)})',
                           ),
                           backgroundColor: AppTheme.coralRose,
                         ),
