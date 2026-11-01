@@ -39,11 +39,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
     return name.contains('tabung') || name.contains('pocket') || name.contains('saving');
   }
 
-  void _showSetBudgetDialog(CategoryItem category, double currentLimit) {
-    _showAddOrEditBudgetDialog(preselectedCategory: category, currentLimit: currentLimit);
-  }
-
-  void _showAddOrEditBudgetDialog({CategoryItem? preselectedCategory, double? currentLimit}) {
+  void _showAddBudgetDialog({CategoryItem? preselectedCategory}) {
     final now = DateTime.now();
     final expenseCategories = widget.storageService
         .getCategories()
@@ -57,28 +53,22 @@ class _BudgetScreenState extends State<BudgetScreen> {
         .where((b) => expenseCatIds.contains(b.categoryId))
         .toList();
     final budgetMap = {for (var b in existingBudgets) b.categoryId: b.monthlyLimit};
-    final wallets = widget.storageService.getWallets();
     final totalCash = widget.storageService.getTotalBalance();
 
     CategoryItem selectedCategory = preselectedCategory ?? expenseCategories.first;
-    double limitVal = currentLimit ?? budgetMap[selectedCategory.id] ?? 0.0;
-
-    final controller = TextEditingController(
-      text: limitVal > 0 ? ThousandsSeparatorInputFormatter.format(limitVal) : '',
-    );
+    final controller = TextEditingController();
 
     showDialog(
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(
           builder: (ctx, setDialogState) {
-            final isEditing = limitVal > 0;
-            final totalMonthlyBudget = existingBudgets
-                .fold(0.0, (sum, b) => sum + b.monthlyLimit);
+            final totalMonthlyBudget = existingBudgets.fold(0.0, (sum, b) => sum + b.monthlyLimit);
             final maxSafeBudget = (totalCash - totalMonthlyBudget).clamp(0.0, double.infinity);
-            final enteredAmount = ThousandsSeparatorInputFormatter.parse(controller.text);
-            final effectiveMax = isEditing ? (limitVal + maxSafeBudget) : maxSafeBudget;
-            final isOverCash = enteredAmount > effectiveMax;
+            final currentLimit = budgetMap[selectedCategory.id] ?? 0.0;
+            final addAmount = ThousandsSeparatorInputFormatter.parse(controller.text);
+            final isOverCash = addAmount > maxSafeBudget;
+            final previewLimit = currentLimit + addAmount;
 
             return AlertDialog(
               backgroundColor: AppTheme.surfaceDark,
@@ -91,35 +81,20 @@ class _BudgetScreenState extends State<BudgetScreen> {
               actionsPadding: const EdgeInsets.fromLTRB(18, 0, 18, 14),
               title: Row(
                 children: [
-                  Icon(
-                    isEditing ? Icons.edit_note_rounded : Icons.add_circle_outline,
-                    color: isEditing ? AppTheme.cyanAccent : AppTheme.emeraldGreen,
+                  const Icon(
+                    Icons.add_circle_outline,
+                    color: AppTheme.emeraldGreen,
                     size: 20,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      isEditing ? '${t('editBudget')}: ${selectedCategory.name}' : t('addBudget'),
+                      'ADD: ${selectedCategory.name}',
                       style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  if (limitVal > 0)
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline_rounded, color: AppTheme.coralRose, size: 20),
-                      tooltip: t('deleteBudget'),
-                      visualDensity: VisualDensity.compact,
-                      onPressed: () async {
-                        final navigator = Navigator.of(dialogContext);
-                        await widget.storageService.deleteBudget(selectedCategory.id, now.month, now.year);
-                        if (mounted) {
-                          setState(() {});
-                          widget.onDataChanged();
-                        }
-                        navigator.pop();
-                      },
-                    ),
                 ],
               ),
               content: SingleChildScrollView(
@@ -177,29 +152,20 @@ class _BudgetScreenState extends State<BudgetScreen> {
                               ),
                             ],
                           ),
-                          if (wallets.isNotEmpty) ...[
-                            const SizedBox(height: 8),
-                            const Divider(height: 1, color: AppTheme.borderDark),
-                            const SizedBox(height: 6),
-                            Wrap(
-                              spacing: 6,
-                              runSpacing: 4,
-                              children: wallets.map((w) {
-                                return Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.surfaceDark,
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: AppTheme.borderDark.withValues(alpha: 0.5)),
-                                  ),
-                                  child: Text(
-                                    '${w.name}: ${_currencyFormat.format(w.balance)}',
-                                    style: const TextStyle(fontSize: 10, color: AppTheme.textMuted),
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                          ],
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                t('currentCategoryLimit'),
+                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                              ),
+                              Text(
+                                _currencyFormat.format(currentLimit),
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+                              ),
+                            ],
+                          ),
                         ],
                       ),
                     ),
@@ -242,11 +208,8 @@ class _BudgetScreenState extends State<BudgetScreen> {
                             onChanged: (val) {
                               if (val != null) {
                                 final newCat = expenseCategories.firstWhere((c) => c.id == val);
-                                final newLimit = budgetMap[val] ?? 0.0;
                                 setDialogState(() {
                                   selectedCategory = newCat;
-                                  limitVal = newLimit;
-                                  controller.text = newLimit > 0 ? ThousandsSeparatorInputFormatter.format(newLimit) : '';
                                 });
                               }
                             },
@@ -255,7 +218,8 @@ class _BudgetScreenState extends State<BudgetScreen> {
                       ),
                       const SizedBox(height: 14),
                     ],
-                    Text(t('enterMonthlyLimit'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+
+                    Text(t('enterAddAmount'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
                     const SizedBox(height: 6),
                     TextField(
                       controller: controller,
@@ -290,11 +254,18 @@ class _BudgetScreenState extends State<BudgetScreen> {
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
-                              '${t('errBudgetExceedsCash')} (${widget.localeService?.isIndonesian == true ? 'Maks' : 'Max'}: ${_currencyFormat.format(effectiveMax)})',
+                              '${t('errBudgetExceedsCash')} (${widget.localeService?.isIndonesian == true ? 'Maks' : 'Max'}: ${_currencyFormat.format(maxSafeBudget)})',
                               style: const TextStyle(fontSize: 11, color: AppTheme.coralRose, fontWeight: FontWeight.w600),
                             ),
                           ),
                         ],
+                      ),
+                    ],
+                    if (addAmount > 0 && !isOverCash) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        t('afterAddInfo').replaceAll('{limit}', _currencyFormat.format(previewLimit)),
+                        style: const TextStyle(fontSize: 11, color: AppTheme.emeraldGreen, fontWeight: FontWeight.w600),
                       ),
                     ],
                     const SizedBox(height: 10),
@@ -315,12 +286,12 @@ class _BudgetScreenState extends State<BudgetScreen> {
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                 onPressed: () {
                                   setDialogState(() {
-                                    controller.text = ThousandsSeparatorInputFormatter.format(effectiveMax);
+                                    controller.text = ThousandsSeparatorInputFormatter.format(maxSafeBudget);
                                   });
                                 },
                               ),
                             ),
-                          ...[100000, 250000, 500000, 1000000, 2000000, 5000000].map((amt) {
+                          ...[50000, 100000, 250000, 500000, 1000000].map((amt) {
                             return Padding(
                               padding: const EdgeInsets.only(right: 6),
                               child: ActionChip(
@@ -372,12 +343,13 @@ class _BudgetScreenState extends State<BudgetScreen> {
                         height: 38,
                         child: ElevatedButton(
                           onPressed: () async {
-                            final limit = ThousandsSeparatorInputFormatter.parse(controller.text);
-                            if (limit > effectiveMax && totalCash > 0) {
+                            final add = ThousandsSeparatorInputFormatter.parse(controller.text);
+                            if (add <= 0) return;
+                            if (add > maxSafeBudget && totalCash > 0) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(
-                                    '${t('errBudgetExceedsCash')} (${widget.localeService?.isIndonesian == true ? 'Maks' : 'Max'}: ${_currencyFormat.format(effectiveMax)})',
+                                    '${t('errBudgetExceedsCash')} (${widget.localeService?.isIndonesian == true ? 'Maks' : 'Max'}: ${_currencyFormat.format(maxSafeBudget)})',
                                   ),
                                   backgroundColor: AppTheme.coralRose,
                                 ),
@@ -386,17 +358,16 @@ class _BudgetScreenState extends State<BudgetScreen> {
                             }
 
                             final navigator = Navigator.of(dialogContext);
-                            if (limit <= 0) {
-                              await widget.storageService.deleteBudget(selectedCategory.id, now.month, now.year);
-                            } else {
-                              await widget.storageService.setBudget(selectedCategory.id, limit, now.month, now.year);
-                            }
+                            final updatedLimit = currentLimit + add;
+                            await widget.storageService.setBudget(selectedCategory.id, updatedLimit, now.month, now.year);
                             if (mounted) {
                               setState(() {});
                               widget.onDataChanged();
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text(t('budgetSavedSuccess')),
+                                  content: Text(
+                                    t('addBudgetSuccess').replaceAll('{amount}', _currencyFormat.format(add)),
+                                  ),
                                   backgroundColor: AppTheme.emeraldGreen,
                                   duration: const Duration(seconds: 2),
                                 ),
@@ -410,7 +381,290 @@ class _BudgetScreenState extends State<BudgetScreen> {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             padding: EdgeInsets.zero,
                           ),
-                          child: Text(t('save'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                          child: Text(t('add'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showCairkanBudgetDialog(CategoryItem category, double currentLimit) {
+    final now = DateTime.now();
+    final expenseCategories = widget.storageService
+        .getCategories()
+        .where((c) => c.type == 'expense' && !_isSavingsCategory(c))
+        .toList();
+    final expenseCatIds = expenseCategories.map((c) => c.id).toSet();
+    final existingBudgets = widget.storageService
+        .getBudgets(now.month, now.year)
+        .where((b) => expenseCatIds.contains(b.categoryId))
+        .toList();
+    final totalCash = widget.storageService.getTotalBalance();
+    final totalMonthlyBudget = existingBudgets.fold(0.0, (sum, b) => sum + b.monthlyLimit);
+    final maxSafeBudget = (totalCash - totalMonthlyBudget).clamp(0.0, double.infinity);
+
+    final controller = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            final cairkanAmount = ThousandsSeparatorInputFormatter.parse(controller.text);
+            final isOverLimit = cairkanAmount > currentLimit;
+            final previewLimit = (currentLimit - cairkanAmount).clamp(0.0, double.infinity);
+
+            return AlertDialog(
+              backgroundColor: AppTheme.surfaceDark,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: const BorderSide(color: AppTheme.borderDark),
+              ),
+              titlePadding: const EdgeInsets.fromLTRB(18, 16, 12, 0),
+              contentPadding: const EdgeInsets.fromLTRB(18, 12, 18, 8),
+              actionsPadding: const EdgeInsets.fromLTRB(18, 0, 18, 14),
+              title: Row(
+                children: [
+                  const Icon(
+                    Icons.account_balance_wallet_outlined,
+                    color: AppTheme.cyanAccent,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${t('cairkanBudgetTitle')}: ${category.name}',
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surfaceLighter,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppTheme.borderDark),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                t('currentCategoryLimit'),
+                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                              ),
+                              Text(
+                                _currencyFormat.format(currentLimit),
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.coralRose),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                t('safeAllocationLeft'),
+                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                              ),
+                              Text(
+                                _currencyFormat.format(maxSafeBudget),
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.cyanAccent),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    Text(t('enterCairkanAmount'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: controller,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [ThousandsSeparatorInputFormatter()],
+                      scrollPadding: const EdgeInsets.all(80),
+                      onChanged: (_) => setDialogState(() {}),
+                      style: TextStyle(
+                        color: isOverLimit ? AppTheme.coralRose : AppTheme.textPrimary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 18,
+                      ),
+                      decoration: InputDecoration(
+                        prefixText: 'Rp ',
+                        prefixStyle: const TextStyle(color: AppTheme.textMuted, fontSize: 16, fontWeight: FontWeight.w700),
+                        hintText: '0',
+                        filled: true,
+                        fillColor: AppTheme.surfaceLighter,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.borderDark)),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: isOverLimit ? AppTheme.coralRose : AppTheme.cyanAccent, width: 1.5),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                    ),
+                    if (isOverLimit) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          const Icon(Icons.warning_amber_rounded, size: 14, color: AppTheme.coralRose),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              '${t('errCairkanExceedsLimit')} (${widget.localeService?.isIndonesian == true ? 'Maks' : 'Max'}: ${_currencyFormat.format(currentLimit)})',
+                              style: const TextStyle(fontSize: 11, color: AppTheme.coralRose, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (cairkanAmount > 0 && !isOverLimit) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        t('afterCairkanInfo').replaceAll('{limit}', _currencyFormat.format(previewLimit)),
+                        style: const TextStyle(fontSize: 11, color: AppTheme.cyanAccent, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                    const SizedBox(height: 10),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          if (currentLimit > 0)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: ActionChip(
+                                label: Text(
+                                  t('cairkanAll'),
+                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.coralRose),
+                                ),
+                                backgroundColor: AppTheme.coralRose.withValues(alpha: 0.12),
+                                side: BorderSide(color: AppTheme.coralRose.withValues(alpha: 0.4)),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                onPressed: () {
+                                  setDialogState(() {
+                                    controller.text = ThousandsSeparatorInputFormatter.format(currentLimit);
+                                  });
+                                },
+                              ),
+                            ),
+                          ...[50000, 100000, 250000, 500000].where((amt) => amt <= currentLimit).map((amt) {
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: ActionChip(
+                                label: Text(
+                                  '+${amt >= 1000000 ? '${amt ~/ 1000000}jt' : '${amt ~/ 1000}rb'}',
+                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                                ),
+                                backgroundColor: AppTheme.surfaceLighter,
+                                side: const BorderSide(color: AppTheme.borderDark),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                onPressed: () {
+                                  final cur = ThousandsSeparatorInputFormatter.parse(controller.text);
+                                  setDialogState(() {
+                                    controller.text = ThousandsSeparatorInputFormatter.format(cur + amt);
+                                  });
+                                },
+                              ),
+                            );
+                          }),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 38,
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(dialogContext),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: AppTheme.borderDark),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            padding: EdgeInsets.zero,
+                          ),
+                          child: Text(
+                            t('cancel'),
+                            style: const TextStyle(color: AppTheme.textMuted, fontSize: 13, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: SizedBox(
+                        height: 38,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            final cairkan = ThousandsSeparatorInputFormatter.parse(controller.text);
+                            if (cairkan <= 0) return;
+                            if (cairkan > currentLimit) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    '${t('errCairkanExceedsLimit')} (${widget.localeService?.isIndonesian == true ? 'Maks' : 'Max'}: ${_currencyFormat.format(currentLimit)})',
+                                  ),
+                                  backgroundColor: AppTheme.coralRose,
+                                ),
+                              );
+                              return;
+                            }
+
+                            final navigator = Navigator.of(dialogContext);
+                            final updatedLimit = currentLimit - cairkan;
+                            if (updatedLimit <= 0) {
+                              await widget.storageService.deleteBudget(category.id, now.month, now.year);
+                            } else {
+                              await widget.storageService.setBudget(category.id, updatedLimit, now.month, now.year);
+                            }
+                            if (mounted) {
+                              setState(() {});
+                              widget.onDataChanged();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    t('cairkanSuccess').replaceAll('{amount}', _currencyFormat.format(cairkan)),
+                                  ),
+                                  backgroundColor: AppTheme.cyanAccent,
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            }
+                            navigator.pop();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.cyanAccent,
+                            foregroundColor: Colors.black,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            padding: EdgeInsets.zero,
+                          ),
+                          child: Text(
+                            widget.localeService?.isIndonesian == true ? 'Cairkan' : 'Withdraw',
+                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                          ),
                         ),
                       ),
                     ),
@@ -531,7 +785,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
                 style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.5, color: AppTheme.textSecondary),
               ),
               InkWell(
-                onTap: () => _showAddOrEditBudgetDialog(),
+                onTap: () => _showAddBudgetDialog(),
                 borderRadius: BorderRadius.circular(8),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
@@ -573,75 +827,105 @@ class _BudgetScreenState extends State<BudgetScreen> {
                 final cat = categories[index];
                 final limit = budgetMap[cat.id] ?? 0.0;
 
-                return GestureDetector(
-                  onTap: () => _showSetBudgetDialog(cat, limit),
-                  child: Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: AppTheme.surfaceDark,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppTheme.borderDark),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  width: 8,
-                                  height: 8,
+                return Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceDark,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppTheme.borderDark),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: Color(cat.colorValue),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                cat.name,
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+                              ),
+                            ],
+                          ),
+                          Text(
+                            limit > 0 ? _currencyFormat.format(limit) : t('notSet'),
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: limit > 0 ? AppTheme.textPrimary : AppTheme.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: InkWell(
+                              onTap: () => _showAddBudgetDialog(preselectedCategory: cat),
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.emeraldGreen.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: AppTheme.emeraldGreen.withValues(alpha: 0.3)),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.add_circle_outline, size: 14, color: AppTheme.emeraldGreen),
+                                    const SizedBox(width: 4),
+                                    const Text(
+                                      'ADD',
+                                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.emeraldGreen),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (limit > 0) ...[
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: InkWell(
+                                onTap: () => _showCairkanBudgetDialog(cat, limit),
+                                borderRadius: BorderRadius.circular(10),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
                                   decoration: BoxDecoration(
-                                    color: Color(cat.colorValue),
-                                    shape: BoxShape.circle,
+                                    color: AppTheme.cyanAccent.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: AppTheme.cyanAccent.withValues(alpha: 0.3)),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(Icons.account_balance_wallet_outlined, size: 14, color: AppTheme.cyanAccent),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        t('cairkanBudget'),
+                                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.cyanAccent),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  cat.name,
-                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
-                                ),
-                              ],
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: AppTheme.surfaceLighter,
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: AppTheme.borderDark),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(limit > 0 ? Icons.edit_outlined : Icons.add, size: 11, color: AppTheme.textSecondary),
-                                  const SizedBox(width: 3),
-                                  Text(
-                                    limit > 0 ? t('edit') : t('add'),
-                                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
-                                  ),
-                                ],
                               ),
                             ),
                           ],
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              limit > 0 ? '${t('limit')}: ${_currencyFormat.format(limit)}' : t('notSet'),
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: limit > 0 ? AppTheme.textPrimary : AppTheme.textMuted,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
+                    ],
                   ),
                 );
               },

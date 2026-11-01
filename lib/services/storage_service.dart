@@ -207,15 +207,26 @@ class StorageService {
     await saveCategories(categories);
   }
 
-  // Budgets
-  List<Budget> getBudgets(int month, int year) {
+  // Budgets (Persistent across months, not reset each month)
+  List<Budget> getBudgets([int? month, int? year]) {
     final raw = _prefs.getString(_keyBudgets);
     if (raw == null) return [];
     final List<dynamic> decoded = jsonDecode(raw);
-    return decoded
-        .map((e) => Budget.fromJson(e))
-        .where((b) => b.month == month && b.year == year)
-        .toList();
+    final all = decoded.map((e) => Budget.fromJson(e)).toList();
+
+    // Group by categoryId and pick the latest active budget so it persists across months
+    final Map<String, Budget> latestByCategory = {};
+    for (final b in all) {
+      if (!latestByCategory.containsKey(b.categoryId)) {
+        latestByCategory[b.categoryId] = b;
+      } else {
+        final existing = latestByCategory[b.categoryId]!;
+        if (b.year > existing.year || (b.year == existing.year && b.month >= existing.month)) {
+          latestByCategory[b.categoryId] = b;
+        }
+      }
+    }
+    return latestByCategory.values.where((b) => b.monthlyLimit > 0).toList();
   }
 
   Future<void> saveBudgets(List<Budget> list) async {
@@ -223,32 +234,37 @@ class StorageService {
     await _prefs.setString(_keyBudgets, raw);
   }
 
-  Future<void> setBudget(String categoryId, double limit, int month, int year) async {
+  Future<void> setBudget(String categoryId, double limit, [int? month, int? year]) async {
+    final now = DateTime.now();
+    final m = month ?? now.month;
+    final y = year ?? now.year;
     final raw = _prefs.getString(_keyBudgets);
     List<Budget> all = [];
     if (raw != null) {
       final List<dynamic> decoded = jsonDecode(raw);
       all = decoded.map((e) => Budget.fromJson(e)).toList();
     }
-    all.removeWhere((b) => b.categoryId == categoryId && b.month == month && b.year == year);
-    all.add(Budget(
-      id: _uuid.v4(),
-      categoryId: categoryId,
-      monthlyLimit: limit,
-      month: month,
-      year: year,
-    ));
+    all.removeWhere((b) => b.categoryId == categoryId);
+    if (limit > 0) {
+      all.add(Budget(
+        id: _uuid.v4(),
+        categoryId: categoryId,
+        monthlyLimit: limit,
+        month: m,
+        year: y,
+      ));
+    }
     await saveBudgets(all);
   }
 
-  Future<void> deleteBudget(String categoryId, int month, int year) async {
+  Future<void> deleteBudget(String categoryId, [int? month, int? year]) async {
     final raw = _prefs.getString(_keyBudgets);
     List<Budget> all = [];
     if (raw != null) {
       final List<dynamic> decoded = jsonDecode(raw);
       all = decoded.map((e) => Budget.fromJson(e)).toList();
     }
-    all.removeWhere((b) => b.categoryId == categoryId && b.month == month && b.year == year);
+    all.removeWhere((b) => b.categoryId == categoryId);
     await saveBudgets(all);
   }
 

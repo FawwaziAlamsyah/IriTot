@@ -774,19 +774,20 @@ class _SavingsScreenState extends State<SavingsScreen> {
       return;
     }
 
-    final targetPocket = preselectedPocket ?? pockets.first;
-    final otherPockets = pockets.where((p) => p.id != targetPocket.id).toList();
+    // Pos Sumber (FROM) TERKUNCI ke kantong/pos yang dipilih
+    final sourcePocket = preselectedPocket ?? pockets.first;
+    final otherPockets = pockets.where((p) => p.id != sourcePocket.id).toList();
 
-    // Default source type: if other pockets exist, use 'pocket', otherwise 'wallet'
-    String sourceType = otherPockets.isNotEmpty ? 'pocket' : 'wallet';
-    String selectedSourcePocketId = otherPockets.isNotEmpty ? otherPockets.first.id : '';
-    String selectedSourceWalletId = wallets.isNotEmpty ? wallets.first.id : '';
+    // Default target type: if other pockets exist, use 'pocket', otherwise 'wallet'
+    String targetType = otherPockets.isNotEmpty ? 'pocket' : 'wallet';
+    String selectedTargetPocketId = otherPockets.isNotEmpty ? otherPockets.first.id : '';
+    String selectedTargetWalletId = wallets.isNotEmpty ? wallets.first.id : '';
 
     final amountCtrl = TextEditingController();
     final noteCtrl = TextEditingController(
       text: widget.localeService?.isIndonesian == true
-          ? 'Transfer dana ke ${targetPocket.name}'
-          : 'Transfer funds to ${targetPocket.name}',
+          ? 'Transfer dana dari ${sourcePocket.name}'
+          : 'Transfer funds from ${sourcePocket.name}',
     );
 
     showModalBottomSheet(
@@ -796,21 +797,19 @@ class _SavingsScreenState extends State<SavingsScreen> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (modalCtx, setModalState) {
-            final activeSourcePocket = otherPockets.firstWhere(
-              (p) => p.id == selectedSourcePocketId,
-              orElse: () => otherPockets.isNotEmpty ? otherPockets.first : targetPocket,
+            final activeTargetPocket = otherPockets.firstWhere(
+              (p) => p.id == selectedTargetPocketId,
+              orElse: () => otherPockets.isNotEmpty ? otherPockets.first : sourcePocket,
             );
-            final activeSourceWallet = wallets.firstWhere(
-              (w) => w.id == selectedSourceWalletId,
+            final activeTargetWallet = wallets.firstWhere(
+              (w) => w.id == selectedTargetWalletId,
               orElse: () => wallets.first,
             );
 
-            final double availableSourceBalance = sourceType == 'pocket'
-                ? activeSourcePocket.currentAmount
-                : activeSourceWallet.balance;
-            final String sourceName = sourceType == 'pocket'
-                ? activeSourcePocket.name
-                : activeSourceWallet.name;
+            final double availableSourceBalance = sourcePocket.currentAmount;
+            final String targetName = targetType == 'pocket'
+                ? activeTargetPocket.name
+                : activeTargetWallet.name;
 
             final enteredAmount = ThousandsSeparatorInputFormatter.parse(amountCtrl.text);
             final isOverBalance = enteredAmount > availableSourceBalance;
@@ -848,16 +847,16 @@ class _SavingsScreenState extends State<SavingsScreen> {
                         const Icon(Icons.swap_horiz_rounded, color: AppTheme.cyanAccent, size: 24),
                         const SizedBox(width: 8),
                         Text(
-                          widget.localeService?.isIndonesian == true ? 'Transfer Dana ke Pos' : 'Transfer Funds to Pocket',
+                          widget.localeService?.isIndonesian == true ? 'Transfer Dana dari Pos' : 'Transfer Funds from Pocket',
                           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.textPrimary),
                         ),
                       ],
                     ),
                     const SizedBox(height: 16),
 
-                    // Pos Tujuan (TARGET) - TERKUNCI KE KATEGORI A
+                    // Pos Asal (FROM) - TERKUNCI KE POS YANG DIPILIH
                     Text(
-                      t('lockedTargetPocket'),
+                      t('lockedSourcePocket'),
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
                     ),
                     const SizedBox(height: 6),
@@ -876,12 +875,12 @@ class _SavingsScreenState extends State<SavingsScreen> {
                               Container(
                                 width: 12,
                                 height: 12,
-                                decoration: BoxDecoration(color: Color(targetPocket.colorValue), shape: BoxShape.circle),
+                                decoration: BoxDecoration(color: Color(sourcePocket.colorValue), shape: BoxShape.circle),
                               ),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
-                                  targetPocket.name,
+                                  sourcePocket.name,
                                   style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
                                 ),
                               ),
@@ -897,7 +896,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
                                     const Icon(Icons.lock_outline, size: 10, color: AppTheme.cyanAccent),
                                     const SizedBox(width: 3),
                                     Text(
-                                      widget.localeService?.isIndonesian == true ? 'Target Terkunci' : 'Target Locked',
+                                      t('lockedSourceBadge'),
                                       style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: AppTheme.cyanAccent),
                                     ),
                                   ],
@@ -907,17 +906,21 @@ class _SavingsScreenState extends State<SavingsScreen> {
                           ),
                           const SizedBox(height: 6),
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                '${widget.localeService?.isIndonesian == true ? 'Saldo saat ini' : 'Current balance'}: ${_currencyFormat.format(targetPocket.currentAmount)}',
-                                style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                              Expanded(
+                                child: Text(
+                                  '${widget.localeService?.isIndonesian == true ? 'Saldo saat ini' : 'Current balance'}: ${_currencyFormat.format(sourcePocket.currentAmount)}',
+                                  style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                              if (targetPocket.targetAmount > 0)
+                              if (sourcePocket.targetAmount > 0) ...[
+                                const SizedBox(width: 8),
                                 Text(
-                                  'Target: ${_currencyFormat.format(targetPocket.targetAmount)}',
+                                  'Target: ${_currencyFormat.format(sourcePocket.targetAmount)}',
                                   style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
                                 ),
+                              ],
                             ],
                           ),
                         ],
@@ -925,41 +928,46 @@ class _SavingsScreenState extends State<SavingsScreen> {
                     ),
                     const SizedBox(height: 14),
 
-                    // Sumber Dana (FROM) - BISA DIUBAH (Antar Pos atau Dompet)
+                    // Pos Tujuan (TARGET / TO) - BISA DIUBAH (Antar Pos atau Dompet)
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          t('sourceFundsLabel'),
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                        Expanded(
+                          child: Text(
+                            t('targetFundsLabel'),
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
+                        const SizedBox(width: 8),
                         Text(
-                          '${t('available')}: ${_currencyFormat.format(availableSourceBalance)}',
-                          style: TextStyle(
+                          targetType == 'pocket'
+                              ? '${t('currentBalance')}: ${_currencyFormat.format(activeTargetPocket.currentAmount)}'
+                              : '${t('walletBalance')}: ${_currencyFormat.format(activeTargetWallet.balance)}',
+                          style: const TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
-                            color: availableSourceBalance > 0 ? AppTheme.cyanAccent : AppTheme.coralRose,
+                            color: AppTheme.cyanAccent,
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 8),
 
-                    // Toggle Sumber: Pos Lain vs Dompet
+                    // Toggle Tujuan: Pos Lain vs Dompet
                     Row(
                       children: [
                         if (otherPockets.isNotEmpty) ...[
                           Expanded(
                             child: InkWell(
-                              onTap: () => setModalState(() => sourceType = 'pocket'),
+                              onTap: () => setModalState(() => targetType = 'pocket'),
                               borderRadius: BorderRadius.circular(10),
                               child: Container(
                                 padding: const EdgeInsets.symmetric(vertical: 8),
                                 decoration: BoxDecoration(
-                                  color: sourceType == 'pocket' ? AppTheme.cyanAccent.withValues(alpha: 0.15) : AppTheme.surfaceLighter,
+                                  color: targetType == 'pocket' ? AppTheme.cyanAccent.withValues(alpha: 0.15) : AppTheme.surfaceLighter,
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(
-                                    color: sourceType == 'pocket' ? AppTheme.cyanAccent : AppTheme.borderDark,
+                                    color: targetType == 'pocket' ? AppTheme.cyanAccent : AppTheme.borderDark,
                                   ),
                                 ),
                                 alignment: Alignment.center,
@@ -968,7 +976,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w700,
-                                    color: sourceType == 'pocket' ? AppTheme.cyanAccent : AppTheme.textMuted,
+                                    color: targetType == 'pocket' ? AppTheme.cyanAccent : AppTheme.textMuted,
                                   ),
                                 ),
                               ),
@@ -979,15 +987,15 @@ class _SavingsScreenState extends State<SavingsScreen> {
                         if (wallets.isNotEmpty)
                           Expanded(
                             child: InkWell(
-                              onTap: () => setModalState(() => sourceType = 'wallet'),
+                              onTap: () => setModalState(() => targetType = 'wallet'),
                               borderRadius: BorderRadius.circular(10),
                               child: Container(
                                 padding: const EdgeInsets.symmetric(vertical: 8),
                                 decoration: BoxDecoration(
-                                  color: sourceType == 'wallet' ? AppTheme.emeraldGreen.withValues(alpha: 0.15) : AppTheme.surfaceLighter,
+                                  color: targetType == 'wallet' ? AppTheme.emeraldGreen.withValues(alpha: 0.15) : AppTheme.surfaceLighter,
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(
-                                    color: sourceType == 'wallet' ? AppTheme.emeraldGreen : AppTheme.borderDark,
+                                    color: targetType == 'wallet' ? AppTheme.emeraldGreen : AppTheme.borderDark,
                                   ),
                                 ),
                                 alignment: Alignment.center,
@@ -996,7 +1004,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w700,
-                                    color: sourceType == 'wallet' ? AppTheme.emeraldGreen : AppTheme.textMuted,
+                                    color: targetType == 'wallet' ? AppTheme.emeraldGreen : AppTheme.textMuted,
                                   ),
                                 ),
                               ),
@@ -1006,7 +1014,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
                     ),
                     const SizedBox(height: 8),
 
-                    // Dropdown pilihan sumber
+                    // Dropdown pilihan tujuan
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14),
                       decoration: BoxDecoration(
@@ -1015,9 +1023,9 @@ class _SavingsScreenState extends State<SavingsScreen> {
                         border: Border.all(color: AppTheme.borderDark),
                       ),
                       child: DropdownButtonHideUnderline(
-                        child: sourceType == 'pocket'
+                        child: targetType == 'pocket'
                             ? DropdownButton<String>(
-                                value: selectedSourcePocketId.isNotEmpty ? selectedSourcePocketId : (otherPockets.isNotEmpty ? otherPockets.first.id : null),
+                                value: selectedTargetPocketId.isNotEmpty ? selectedTargetPocketId : (otherPockets.isNotEmpty ? otherPockets.first.id : null),
                                 isExpanded: true,
                                 dropdownColor: AppTheme.surfaceDark,
                                 items: otherPockets.map((p) {
@@ -1039,11 +1047,11 @@ class _SavingsScreenState extends State<SavingsScreen> {
                                   );
                                 }).toList(),
                                 onChanged: (val) {
-                                  if (val != null) setModalState(() => selectedSourcePocketId = val);
+                                  if (val != null) setModalState(() => selectedTargetPocketId = val);
                                 },
                               )
                             : DropdownButton<String>(
-                                value: selectedSourceWalletId.isNotEmpty ? selectedSourceWalletId : (wallets.isNotEmpty ? wallets.first.id : null),
+                                value: selectedTargetWalletId.isNotEmpty ? selectedTargetWalletId : (wallets.isNotEmpty ? wallets.first.id : null),
                                 isExpanded: true,
                                 dropdownColor: AppTheme.surfaceDark,
                                 items: wallets.map((w) {
@@ -1061,7 +1069,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
                                   );
                                 }).toList(),
                                 onChanged: (val) {
-                                  if (val != null) setModalState(() => selectedSourceWalletId = val);
+                                  if (val != null) setModalState(() => selectedTargetWalletId = val);
                                 },
                               ),
                       ),
@@ -1102,7 +1110,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
-                              '${widget.localeService?.isIndonesian == true ? 'Melebihi saldo sumber tersedia (Maks:' : 'Exceeds available source balance (Max:'} ${_currencyFormat.format(availableSourceBalance)})',
+                              '${widget.localeService?.isIndonesian == true ? 'Melebihi saldo pos sumber (Maks:' : 'Exceeds available source balance (Max:'} ${_currencyFormat.format(availableSourceBalance)})',
                               style: const TextStyle(fontSize: 11, color: AppTheme.coralRose, fontWeight: FontWeight.w600),
                             ),
                           ),
@@ -1171,7 +1179,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
                       keyboardType: TextInputType.multiline,
                       style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
                       decoration: InputDecoration(
-                        hintText: widget.localeService?.isIndonesian == true ? 'Contoh: Alokasi dana untuk pos tabungan' : 'e.g. Savings allocation',
+                        hintText: widget.localeService?.isIndonesian == true ? 'Contoh: Pindah dana untuk pos lain' : 'e.g. Move funds to another pocket',
                         filled: true,
                         fillColor: AppTheme.surfaceLighter,
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppTheme.borderDark)),
@@ -1206,20 +1214,20 @@ class _SavingsScreenState extends State<SavingsScreen> {
                           final navigator = Navigator.of(modalCtx);
                           final messenger = ScaffoldMessenger.of(context);
 
-                          if (sourceType == 'pocket') {
+                          if (targetType == 'pocket') {
                             await widget.storageService.transferBetweenPockets(
-                              sourcePocketId: selectedSourcePocketId,
-                              targetPocketId: targetPocket.id,
+                              sourcePocketId: sourcePocket.id,
+                              targetPocketId: selectedTargetPocketId,
                               amount: amount,
                               note: noteCtrl.text.trim().isEmpty ? null : noteCtrl.text.trim(),
                             );
                           } else {
-                            await widget.storageService.depositToSavings(
-                              pocketId: targetPocket.id,
-                              walletId: selectedSourceWalletId,
+                            await widget.storageService.withdrawFromSavings(
+                              pocketId: sourcePocket.id,
+                              walletId: selectedTargetWalletId,
                               amount: amount,
                               note: noteCtrl.text.trim().isEmpty
-                                  ? 'Transfer dari $sourceName'
+                                  ? 'Transfer ke $targetName'
                                   : noteCtrl.text.trim(),
                             );
                           }
@@ -1234,8 +1242,8 @@ class _SavingsScreenState extends State<SavingsScreen> {
                             SnackBar(
                               content: Text(
                                 widget.localeService?.isIndonesian == true
-                                    ? 'Berhasil mentransfer ${_currencyFormat.format(amount)} ke ${targetPocket.name}!'
-                                    : 'Transferred ${_currencyFormat.format(amount)} to ${targetPocket.name}!',
+                                    ? 'Berhasil mentransfer ${_currencyFormat.format(amount)} dari ${sourcePocket.name} ke $targetName!'
+                                    : 'Transferred ${_currencyFormat.format(amount)} from ${sourcePocket.name} to $targetName!',
                               ),
                               backgroundColor: AppTheme.cyanAccent,
                               behavior: SnackBarBehavior.floating,
@@ -1248,7 +1256,7 @@ class _SavingsScreenState extends State<SavingsScreen> {
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                         ),
                         child: Text(
-                          '${widget.localeService?.isIndonesian == true ? 'Pindahkan Dana ke' : 'Transfer Funds to'} ${targetPocket.name}',
+                          '${widget.localeService?.isIndonesian == true ? 'Pindahkan Dana ke' : 'Transfer Funds to'} $targetName',
                           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
                         ),
                       ),

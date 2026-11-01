@@ -355,7 +355,7 @@ void main() {
     expect(find.text('Enter Passcode'), findsOneWidget);
   });
 
-  testWidgets('SavingsScreen pocket cards render compact Setor, Tarik, Transfer and locked target in transfer modal', (WidgetTester tester) async {
+  testWidgets('SavingsScreen pocket cards render compact Setor, Tarik, Transfer and locked source in transfer modal', (WidgetTester tester) async {
     TestWidgetsFlutterBinding.ensureInitialized();
     await initializeDateFormatting('en_US', null);
     await initializeDateFormatting('id_ID', null);
@@ -409,8 +409,8 @@ void main() {
     await tester.tap(find.text('Transfer').first);
     await tester.pumpAndSettle();
 
-    // Verify modal opened with Target Locked to 'Liburan Bali'
-    expect(find.text('Target Locked'), findsOneWidget);
+    // Verify modal opened with Source Locked to 'Liburan Bali'
+    expect(find.text('Source Locked'), findsOneWidget);
     expect(find.text('Liburan Bali'), findsAtLeastNWidgets(1));
     expect(find.text('Other Pocket'), findsOneWidget);
     expect(find.text('Cash/Bank Wallet'), findsOneWidget);
@@ -721,7 +721,8 @@ void main() {
     await tester.tapAt(const Offset(20, 20));
     await tester.pumpAndSettle();
 
-    // 2. Test BudgetScreen edit dialog compact buttons layout
+    // 2. Test BudgetScreen ADD and Cairkan ke Wallet buttons (no edit dialog)
+    await locale.setLocale('id');
     final now = DateTime.now();
     await storage.setBudget('cat_food', 500000, now.month, now.year);
 
@@ -736,28 +737,48 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    // Scroll and tap Food budget card to open edit dialog
+    // Food category card shows Makan & Minum and limit 500.000
     expect(find.text('Makan & Minum'), findsWidgets);
-    await tester.ensureVisible(find.text('Makan & Minum').first);
-    await tester.tap(find.text('Makan & Minum').first);
+    expect(find.text('Rp 500.000'), findsWidgets);
+
+    // Verify ADD and Cairkan ke Wallet buttons exist
+    expect(find.text('ADD'), findsWidgets);
+    expect(find.text('Cairkan ke Wallet'), findsOneWidget);
+    // Verify no edit button exists
+    expect(find.text('Edit Budget'), findsNothing);
+    expect(find.text('Ubah'), findsNothing);
+
+    // Tap ADD button for Makan & Minum
+    await tester.ensureVisible(find.text('ADD').first);
+    await tester.tap(find.text('ADD').first);
     await tester.pumpAndSettle();
 
-    // Verify Edit Budget dialog is opened
-    expect(find.textContaining('Edit Budget'), findsOneWidget);
-
-    // Verify compact actions: Cancel and Save exist
-    expect(find.text('Cancel'), findsOneWidget);
-    expect(find.text('Save'), findsOneWidget);
-
-    // Verify header delete icon button exists
-    expect(find.byIcon(Icons.delete_outline_rounded), findsOneWidget);
-
-    // Verify old large text button 'Delete Budget' is not in actions
-    expect(find.text('Delete Budget'), findsNothing);
-
-    // Tap Cancel closes dialog
-    await tester.tap(find.text('Cancel'));
+    // Verify ADD dialog is opened
+    expect(find.textContaining('ADD: Makan & Minum'), findsOneWidget);
+    await tester.tap(find.text('Batal'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Edit Budget'), findsNothing);
+
+    // Tap Cairkan ke Wallet button
+    await tester.ensureVisible(find.text('Cairkan ke Wallet'));
+    await tester.tap(find.text('Cairkan ke Wallet'));
+    await tester.pumpAndSettle();
+
+    // Verify Cairkan dialog is opened with Cairkan Semua chip
+    expect(find.textContaining('Cairkan ke Wallet: Makan & Minum'), findsOneWidget);
+    expect(find.text('Cairkan Semua'), findsOneWidget);
+    await tester.tap(find.text('Batal'));
+    await tester.pumpAndSettle();
+
+    // 3. Test that monthly budget does NOT reset across months
+    // Set budget in month 10 (October)
+    await storage.setBudget('cat_shopping', 300000, 10, 2026);
+    // Query budget in month 11 (November)
+    final novBudgets = storage.getBudgets(11, 2026);
+    final shoppingBudgetNov = novBudgets.firstWhere((b) => b.categoryId == 'cat_shopping');
+    expect(shoppingBudgetNov.monthlyLimit, 300000);
+    // Query budget in month 12 (December)
+    final decBudgets = storage.getBudgets(12, 2026);
+    final shoppingBudgetDec = decBudgets.firstWhere((b) => b.categoryId == 'cat_shopping');
+    expect(shoppingBudgetDec.monthlyLimit, 300000);
   });
 }
