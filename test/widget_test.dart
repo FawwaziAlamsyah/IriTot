@@ -9,6 +9,7 @@ import 'package:iritot/services/auth_service.dart';
 import 'package:iritot/services/locale_service.dart';
 import 'package:iritot/models/savings_pocket.dart';
 import 'package:iritot/models/wallet.dart';
+import 'package:iritot/models/budget.dart';
 import 'package:iritot/models/transaction_item.dart';
 import 'package:iritot/screens/splash_screen.dart';
 import 'package:iritot/screens/login_screen.dart';
@@ -780,5 +781,124 @@ void main() {
     final decBudgets = storage.getBudgets(12, 2026);
     final shoppingBudgetDec = decBudgets.firstWhere((b) => b.categoryId == 'cat_shopping');
     expect(shoppingBudgetDec.monthlyLimit, 300000);
+  });
+
+  testWidgets('Unallocated cash expense succeeds when amount <= totalCash - activeBudgets, and insufficient error formats (Rp 0) properly', (WidgetTester tester) async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    SharedPreferences.setMockInitialValues({});
+
+    final storage = await StorageService.init();
+    final locale = await LocaleService.init();
+    final ai = await AiService.init();
+    final now = DateTime.now();
+
+    // Setup total cash = 553.500
+    final wallet = storage.getWallets().first;
+    wallet.balance = 553500;
+    await storage.saveWallets([wallet]);
+
+    // Setup active budget = 400.000 for Makan & Minum
+    await storage.setBudget('cat_food', 400000, now.month, now.year);
+
+    // Setup an old/deleted category budget of 200.000 (orphaned budget)
+    // This should NOT affect active monthly budget calculation
+    final rawBudgets = storage.getBudgets();
+    await storage.saveBudgets([
+      ...rawBudgets,
+      Budget(
+        id: 'orphaned_b',
+        categoryId: 'deleted_cat_123',
+        monthlyLimit: 200000,
+        month: now.month,
+        year: now.year,
+      ),
+    ]);
+
+    await tester.pumpWidget(MaterialApp(
+      home: Builder(
+        builder: (ctx) => Scaffold(
+          body: ElevatedButton(
+            onPressed: () {
+              showModalBottomSheet(
+                context: ctx,
+                isScrollControlled: true,
+                builder: (_) => AddTransactionModal(
+                  storageService: storage,
+                  aiService: ai,
+                  localeService: locale,
+                  onTransactionAdded: () {},
+                ),
+              );
+            },
+            child: const Text('Open Modal'),
+          ),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    // 1. Open modal and record expense 125.000 with No Category
+    await tester.tap(find.text('Open Modal'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField).first, '125000');
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('No Category'));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Save Expense'));
+    await tester.tap(find.text('Save Expense'));
+    await tester.pumpAndSettle();
+
+    // Verify transaction 125.000 is saved successfully without error
+    final txs = storage.getTransactions();
+    expect(txs.any((t) => t.categoryId == 'no_category' && t.amount == 125000), isTrue);
+
+    // 2. Now remaining unallocated cash is: 553.500 - 125.000 = 428.500.
+    // 428.500 - 400.000 budget = 28.500.
+    // If user enters 50.000, it should fail and show available amount (Rp 28.500)
+    await tester.tap(find.text('Open Modal'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField).first, '50000');
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('No Category'));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Save Expense'));
+    await tester.tap(find.text('Save Expense'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Non-category funds insufficient (Rp 28.500)'), findsOneWidget);
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+
+    // Close modal
+    await tester.tapAt(const Offset(20, 20));
+    await tester.pumpAndSettle();
+
+    // 3. Test when unallocated cash is 0: it shows (Rp 0), NOT empty (Rp )
+    // Set wallet balance equal to monthly budget = 400.000
+    wallet.balance = 400000;
+    await storage.saveWallets([wallet]);
+
+    await tester.tap(find.text('Open Modal'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField).first, '10000');
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('No Category'));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Save Expense'));
+    await tester.tap(find.text('Save Expense'));
+    await tester.pumpAndSettle();
+
+    // Verify it shows '(Rp 0)', and does NOT show '(Rp )'
+    expect(find.textContaining('Non-category funds insufficient (Rp 0)'), findsOneWidget);
+    expect(find.textContaining('(Rp )'), findsNothing);
   });
 }

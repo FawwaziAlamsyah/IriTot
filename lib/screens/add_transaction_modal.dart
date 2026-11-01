@@ -340,6 +340,12 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
     );
   }
 
+  bool _isSavingsCategory(CategoryItem c) {
+    if (c.id == 'cat_savings') return true;
+    final name = c.name.toLowerCase();
+    return name.contains('tabung') || name.contains('pocket') || name.contains('saving');
+  }
+
   void _saveTransaction() async {
     final amount = ThousandsSeparatorInputFormatter.parse(_amountController.text);
     if (amount <= 0) {
@@ -358,13 +364,22 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
     if (_type == 'expense') {
       final now = _selectedDate;
       final totalCash = widget.storageService.getTotalBalance();
-      final existingBudgets = widget.storageService.getBudgets(now.month, now.year);
+      final activeExpenseCatIds = _categories
+          .where((c) => c.type == 'expense' && !_isSavingsCategory(c))
+          .map((c) => c.id)
+          .toSet();
+      final existingBudgets = widget.storageService
+          .getBudgets(now.month, now.year)
+          .where((b) => activeExpenseCatIds.contains(b.categoryId))
+          .toList();
       final totalMonthlyBudget = existingBudgets.fold(0.0, (sum, b) => sum + b.monthlyLimit);
       final unallocatedCash = (totalCash - totalMonthlyBudget).clamp(0.0, double.infinity);
 
       if (isNoCategory) {
         if (amount > unallocatedCash) {
-          final fmtAvailable = ThousandsSeparatorInputFormatter.format(unallocatedCash);
+          final fmtAvailable = unallocatedCash <= 0
+              ? '0'
+              : ThousandsSeparatorInputFormatter.format(unallocatedCash);
           _showValidationAlert(
             '${t('errNonCategoryInsufficient')} (Rp $fmtAvailable). ${t('errPleaseSelectCategoryWithLimit')}',
           );

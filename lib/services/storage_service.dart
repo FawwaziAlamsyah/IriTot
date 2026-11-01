@@ -205,6 +205,7 @@ class StorageService {
     final categories = getCategories();
     categories.removeWhere((c) => c.id == id);
     await saveCategories(categories);
+    await deleteBudget(id);
   }
 
   // Budgets (Persistent across months, not reset each month)
@@ -226,7 +227,10 @@ class StorageService {
         }
       }
     }
-    return latestByCategory.values.where((b) => b.monthlyLimit > 0).toList();
+    final existingCatIds = getCategories().map((c) => c.id).toSet();
+    return latestByCategory.values
+        .where((b) => b.monthlyLimit > 0 && existingCatIds.contains(b.categoryId))
+        .toList();
   }
 
   Future<void> saveBudgets(List<Budget> list) async {

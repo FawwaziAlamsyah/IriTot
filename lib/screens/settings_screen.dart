@@ -248,7 +248,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         Text(
-                          '${widget.localeService.isIndonesian ? 'Saldo saat ini' : 'Current balance'}: Rp ${ThousandsSeparatorInputFormatter.format(w.balance)}',
+                          '${widget.localeService.isIndonesian ? 'Saldo saat ini' : 'Current balance'}: Rp ${ThousandsSeparatorInputFormatter.format(w.balance).isEmpty ? '0' : ThousandsSeparatorInputFormatter.format(w.balance)}',
                           style: const TextStyle(fontSize: 11, color: AppTheme.emeraldGreen, fontWeight: FontWeight.w600),
                         ),
                       ],
@@ -1856,7 +1856,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              'Rp ${ThousandsSeparatorInputFormatter.format(wallets[i].balance)}',
+                              'Rp ${ThousandsSeparatorInputFormatter.format(wallets[i].balance).isEmpty ? '0' : ThousandsSeparatorInputFormatter.format(wallets[i].balance)}',
                               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
                             ),
                             const SizedBox(width: 4),
