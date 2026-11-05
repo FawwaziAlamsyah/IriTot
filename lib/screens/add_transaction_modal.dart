@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
+import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/transaction_item.dart';
 import '../models/wallet.dart';
@@ -53,7 +54,7 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
   late String _selectedWalletId;
   String? _selectedDestWalletId;
   late String _selectedCategoryId;
-  final DateTime _selectedDate = DateTime.now();
+  DateTime _selectedDate = DateTime.now();
 
   bool _isVoiceRecording = false;
   bool _isScanningReceipt = false;
@@ -338,6 +339,60 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
         );
       },
     );
+  }
+
+  String _formatDate(DateTime date) {
+    final locale = widget.localeService?.isIndonesian == true ? 'id_ID' : 'en_US';
+    return DateFormat('EEEE, dd MMM yyyy', locale).format(date);
+  }
+
+  bool _isTodayDate(DateTime date) {
+    final now = DateTime.now();
+    return date.year == now.year && date.month == now.month && date.day == now.day;
+  }
+
+  bool _isYesterdayDate(DateTime date) {
+    final now = DateTime.now();
+    final yest = now.subtract(const Duration(days: 1));
+    return date.year == yest.year && date.month == yest.month && date.day == yest.day;
+  }
+
+  Future<void> _pickDate(BuildContext context) async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate.isAfter(now) ? now : _selectedDate,
+      firstDate: DateTime(2020),
+      lastDate: now,
+      builder: (context, child) {
+        return Theme(
+          data: ThemeData.dark().copyWith(
+            scaffoldBackgroundColor: AppTheme.bgDark,
+            colorScheme: const ColorScheme.dark(
+              primary: AppTheme.emeraldGreen,
+              onPrimary: Colors.black,
+              surface: AppTheme.surfaceDark,
+              onSurface: AppTheme.textPrimary,
+            ),
+            dialogTheme: const DialogThemeData(backgroundColor: AppTheme.surfaceDark),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() {
+        _selectedDate = DateTime(
+          picked.year,
+          picked.month,
+          picked.day,
+          now.hour,
+          now.minute,
+          now.second,
+        );
+      });
+    }
   }
 
   bool _isSavingsCategory(CategoryItem c) {
@@ -747,6 +802,105 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
             ),
             const SizedBox(height: 18),
 
+            // Date Selection
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  t('addTxDate'),
+                  style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+                if (_isTodayDate(_selectedDate))
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppTheme.emeraldGreen.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      t('today'),
+                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppTheme.emeraldGreen),
+                    ),
+                  )
+                else if (_isYesterdayDate(_selectedDate))
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppTheme.cyanAccent.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      t('yesterday'),
+                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppTheme.cyanAccent),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            InkWell(
+              onTap: () => _pickDate(context),
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceLighter,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppTheme.borderDark),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.calendar_today_outlined, size: 16, color: AppTheme.cyanAccent),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _formatDate(_selectedDate),
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
+                      ),
+                    ),
+                    const Icon(Icons.arrow_drop_down, color: AppTheme.textMuted),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // Quick Date Chips: Hari Ini | Kemarin | Kalender
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildQuickDateChip(
+                    label: t('today'),
+                    isSelected: _isTodayDate(_selectedDate),
+                    onTap: () {
+                      final now = DateTime.now();
+                      setState(() => _selectedDate = now);
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  _buildQuickDateChip(
+                    label: t('yesterday'),
+                    isSelected: _isYesterdayDate(_selectedDate),
+                    onTap: () {
+                      final now = DateTime.now();
+                      final yest = now.subtract(const Duration(days: 1));
+                      setState(() {
+                        _selectedDate = DateTime(yest.year, yest.month, yest.day, now.hour, now.minute, now.second);
+                      });
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  _buildQuickDateChip(
+                    label: t('chooseCalendar'),
+                    isSelected: !_isTodayDate(_selectedDate) && !_isYesterdayDate(_selectedDate),
+                    icon: Icons.edit_calendar_outlined,
+                    onTap: () => _pickDate(context),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+
             // Category Selection (Optional: with "Tanpa Kategori")
             Text(
               t('addTxCategory'),
@@ -927,6 +1081,46 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
         side: const BorderSide(color: AppTheme.borderDark),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         onPressed: () => _addQuickAmount(amount),
+      ),
+    );
+  }
+
+  Widget _buildQuickDateChip({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+    IconData? icon,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? AppTheme.cyanAccent.withValues(alpha: 0.15) : AppTheme.surfaceLighter,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? AppTheme.cyanAccent : AppTheme.borderDark,
+            width: isSelected ? 1.2 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 13, color: isSelected ? AppTheme.cyanAccent : AppTheme.textSecondary),
+              const SizedBox(width: 5),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected ? AppTheme.cyanAccent : AppTheme.textSecondary,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

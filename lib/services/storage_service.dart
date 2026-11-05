@@ -290,6 +290,7 @@ class StorageService {
   Future<void> addTransaction(TransactionItem item) async {
     final transactions = getTransactions();
     transactions.add(item);
+    transactions.sort((a, b) => b.date.compareTo(a.date));
     await saveTransactions(transactions);
 
     // Update wallet balance otomatis

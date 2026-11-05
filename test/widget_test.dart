@@ -629,6 +629,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Select "No Category"
+    await tester.ensureVisible(find.text('No Category'));
     await tester.tap(find.text('No Category'));
     await tester.pumpAndSettle();
 
@@ -651,6 +652,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Tap No Category
+    await tester.ensureVisible(find.text('No Category'));
     await tester.tap(find.text('No Category'));
     await tester.pumpAndSettle();
 
@@ -844,6 +846,7 @@ void main() {
     await tester.enterText(find.byType(TextField).first, '125000');
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.text('No Category'));
     await tester.tap(find.text('No Category'));
     await tester.pumpAndSettle();
 
@@ -864,6 +867,7 @@ void main() {
     await tester.enterText(find.byType(TextField).first, '50000');
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.text('No Category'));
     await tester.tap(find.text('No Category'));
     await tester.pumpAndSettle();
 
@@ -890,6 +894,7 @@ void main() {
     await tester.enterText(find.byType(TextField).first, '10000');
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.text('No Category'));
     await tester.tap(find.text('No Category'));
     await tester.pumpAndSettle();
 
@@ -900,5 +905,103 @@ void main() {
     // Verify it shows '(Rp 0)', and does NOT show '(Rp )'
     expect(find.textContaining('Non-category funds insufficient (Rp 0)'), findsOneWidget);
     expect(find.textContaining('(Rp )'), findsNothing);
+  });
+
+  testWidgets('AddTransactionModal date picker defaults to sysdate and allows selecting custom date which reflects in history', (WidgetTester tester) async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    await initializeDateFormatting('en_US', null);
+    await initializeDateFormatting('id_ID', null);
+    SharedPreferences.setMockInitialValues({});
+
+    final storage = await StorageService.init();
+    final locale = await LocaleService.init();
+    await locale.setLocale('id');
+    final ai = await AiService.init();
+
+    // Top up wallet
+    final wallet = storage.getWallets().first;
+    wallet.balance = 1000000;
+    await storage.saveWallets([wallet]);
+
+    await tester.pumpWidget(MaterialApp(
+      home: Builder(
+        builder: (ctx) => Scaffold(
+          body: ElevatedButton(
+            onPressed: () {
+              showModalBottomSheet(
+                context: ctx,
+                isScrollControlled: true,
+                builder: (_) => AddTransactionModal(
+                  storageService: storage,
+                  aiService: ai,
+                  localeService: locale,
+                  onTransactionAdded: () {},
+                ),
+              );
+            },
+            child: const Text('Open Modal'),
+          ),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Open Modal'));
+    await tester.pumpAndSettle();
+
+    // 1. Verify "Tanggal Transaksi" header exists
+    expect(find.text('Tanggal Transaksi'), findsOneWidget);
+
+    // 2. Verify default date is today (sysdate) and shows 'Hari ini' badge
+    expect(find.text('Hari ini'), findsWidgets);
+
+    // 3. Tap quick chip 'Kemarin'
+    await tester.ensureVisible(find.text('Kemarin'));
+    await tester.tap(find.text('Kemarin'));
+    await tester.pumpAndSettle();
+
+    // Verify 'Kemarin' badge is now active
+    expect(find.text('Kemarin'), findsWidgets);
+
+    // 4. Enter amount and note
+    await tester.enterText(find.byType(TextField).first, '75000');
+    await tester.pumpAndSettle();
+
+    // Tap Save Expense
+    await tester.ensureVisible(find.text('Simpan Pengeluaran'));
+    await tester.tap(find.text('Simpan Pengeluaran'));
+    await tester.pumpAndSettle();
+
+    // 5. Verify transaction is saved with yesterday's date
+    final txs = storage.getTransactions();
+    expect(txs.length, 1);
+    final savedTx = txs.first;
+    expect(savedTx.amount, 75000);
+
+    final now = DateTime.now();
+    final yesterday = now.subtract(const Duration(days: 1));
+    expect(savedTx.date.year, yesterday.year);
+    expect(savedTx.date.month, yesterday.month);
+    expect(savedTx.date.day, yesterday.day);
+
+    // 6. Record another transaction with today's date
+    await tester.tap(find.text('Open Modal'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField).first, '50000');
+    await tester.pumpAndSettle();
+
+    // Keep default (Hari ini)
+    await tester.ensureVisible(find.text('Simpan Pengeluaran'));
+    await tester.tap(find.text('Simpan Pengeluaran'));
+    await tester.pumpAndSettle();
+
+    // Verify chronological order: today's transaction (50.000) is first, yesterday's (75.000) is second
+    final updatedTxs = storage.getTransactions();
+    expect(updatedTxs.length, 2);
+    expect(updatedTxs[0].amount, 50000);
+    expect(updatedTxs[0].date.day, now.day);
+    expect(updatedTxs[1].amount, 75000);
+    expect(updatedTxs[1].date.day, yesterday.day);
   });
 }
