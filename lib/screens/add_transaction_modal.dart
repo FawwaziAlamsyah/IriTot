@@ -87,6 +87,8 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
     }
     if (widget.initialWalletId != null && _wallets.any((w) => w.id == widget.initialWalletId)) {
       _selectedWalletId = widget.initialWalletId!;
+    } else {
+      _autoSwitchWalletForCategory(_selectedCategoryId);
     }
 
     if (widget.openWithVoice) {
@@ -391,7 +393,19 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
           now.minute,
           now.second,
         );
+        _autoSwitchWalletForCategory(_selectedCategoryId);
       });
+    }
+  }
+
+  void _autoSwitchWalletForCategory(String categoryId) {
+    if (categoryId.isEmpty || categoryId == 'no_category') return;
+    final budgets = widget.storageService.getBudgets(_selectedDate.month, _selectedDate.year);
+    final b = budgets.where((b) => b.categoryId == categoryId).firstOrNull;
+    if (b != null && b.walletId != null && b.walletId!.isNotEmpty) {
+      if (_wallets.any((w) => w.id == b.walletId)) {
+        _selectedWalletId = b.walletId!;
+      }
     }
   }
 
@@ -411,6 +425,28 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
     if (_type == 'transfer' && _selectedWalletId == _selectedDestWalletId) {
       _showValidationAlert(t('errSameWallet'));
       return;
+    }
+
+    final currentWallets = widget.storageService.getWallets();
+    final selectedWallet = currentWallets.firstWhere(
+      (w) => w.id == _selectedWalletId,
+      orElse: () => _wallets.firstWhere(
+        (w) => w.id == _selectedWalletId,
+        orElse: () => _wallets.first,
+      ),
+    );
+
+    // Strict wallet balance validation: wallet balance must not go below 0
+    if (_type == 'expense' || _type == 'transfer') {
+      if (amount > selectedWallet.balance) {
+        final fmtBal = selectedWallet.balance <= 0
+            ? '0'
+            : ThousandsSeparatorInputFormatter.format(selectedWallet.balance);
+        _showValidationAlert(
+          '${t('errInsufficientWalletBalance')} (${selectedWallet.name}: Rp $fmtBal). ${t('errPleaseSelectWalletWithBalance')}',
+        );
+        return;
+      }
     }
 
     final isNoCategory = _selectedCategoryId == 'no_category' || _selectedCategoryId.isEmpty;
@@ -743,9 +779,35 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
                             isExpanded: true,
                             dropdownColor: AppTheme.surfaceDark,
                             items: _wallets.map((w) {
+                              final isZero = w.balance <= 0;
+                              final fmtBal = isZero ? '0' : ThousandsSeparatorInputFormatter.format(w.balance);
                               return DropdownMenuItem(
                                 value: w.id,
-                                child: Text(w.name, style: const TextStyle(fontSize: 13, color: AppTheme.textPrimary)),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        w.name,
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: isZero ? AppTheme.textMuted : AppTheme.textPrimary,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      isZero ? 'Rp 0 (${t('emptyBalance')})' : 'Rp $fmtBal',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: isZero ? AppTheme.coralRose : AppTheme.emeraldGreen,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               );
                             }).toList(),
                             onChanged: (val) {
@@ -783,9 +845,31 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
                               items: _wallets
                                   .where((w) => w.id != _selectedWalletId)
                                   .map((w) {
+                                final isZero = w.balance <= 0;
+                                final fmtBal = isZero ? '0' : ThousandsSeparatorInputFormatter.format(w.balance);
                                 return DropdownMenuItem(
                                   value: w.id,
-                                  child: Text(w.name, style: const TextStyle(fontSize: 13, color: AppTheme.textPrimary)),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          w.name,
+                                          style: const TextStyle(fontSize: 13, color: AppTheme.textPrimary),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Rp $fmtBal',
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppTheme.textMuted,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 );
                               }).toList(),
                               onChanged: (val) {
@@ -874,7 +958,10 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
                     isSelected: _isTodayDate(_selectedDate),
                     onTap: () {
                       final now = DateTime.now();
-                      setState(() => _selectedDate = now);
+                      setState(() {
+                        _selectedDate = now;
+                        _autoSwitchWalletForCategory(_selectedCategoryId);
+                      });
                     },
                   ),
                   const SizedBox(width: 8),
@@ -886,6 +973,7 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
                       final yest = now.subtract(const Duration(days: 1));
                       setState(() {
                         _selectedDate = DateTime(yest.year, yest.month, yest.day, now.hour, now.minute, now.second);
+                        _autoSwitchWalletForCategory(_selectedCategoryId);
                       });
                     },
                   ),
@@ -950,7 +1038,13 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
                   final cat = filteredCategories[index - 1];
                   final isSelected = cat.id == _selectedCategoryId;
                   return GestureDetector(
-                    onTap: () => setState(() => _selectedCategoryId = isSelected ? 'no_category' : cat.id),
+                    onTap: () {
+                      final nextCatId = isSelected ? 'no_category' : cat.id;
+                      setState(() {
+                        _selectedCategoryId = nextCatId;
+                        _autoSwitchWalletForCategory(nextCatId);
+                      });
+                    },
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       decoration: BoxDecoration(
@@ -1046,6 +1140,7 @@ class _AddTransactionModalState extends State<AddTransactionModal> {
               final newCats = _categories.where((c) => c.type == type).toList();
               if (newCats.isNotEmpty) {
                 _selectedCategoryId = newCats.first.id;
+                _autoSwitchWalletForCategory(_selectedCategoryId);
               } else {
                 _selectedCategoryId = 'no_category';
               }

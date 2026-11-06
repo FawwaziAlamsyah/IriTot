@@ -1,6 +1,7 @@
 class Budget {
   final String id;
   final String categoryId;
+  final String? walletId; // ID dompet sumber pendanaan anggaran
   final double monthlyLimit;
   final int month;
   final int year;
@@ -8,6 +9,7 @@ class Budget {
   Budget({
     required this.id,
     required this.categoryId,
+    this.walletId,
     required this.monthlyLimit,
     required this.month,
     required this.year,
@@ -17,6 +19,7 @@ class Budget {
     return {
       'id': id,
       'categoryId': categoryId,
+      'walletId': walletId,
       'monthlyLimit': monthlyLimit,
       'month': month,
       'year': year,
@@ -27,6 +30,7 @@ class Budget {
     return Budget(
       id: json['id'] as String,
       categoryId: json['categoryId'] as String,
+      walletId: json['walletId'] as String?,
       monthlyLimit: (json['monthlyLimit'] as num).toDouble(),
       month: json['month'] as int,
       year: json['year'] as int,

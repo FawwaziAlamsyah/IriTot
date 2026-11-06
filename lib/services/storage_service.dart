@@ -238,21 +238,27 @@ class StorageService {
     await _prefs.setString(_keyBudgets, raw);
   }
 
-  Future<void> setBudget(String categoryId, double limit, [int? month, int? year]) async {
+  Future<void> setBudget(String categoryId, double limit, [int? month, int? year, String? walletId]) async {
     final now = DateTime.now();
     final m = month ?? now.month;
     final y = year ?? now.year;
     final raw = _prefs.getString(_keyBudgets);
     List<Budget> all = [];
+    String? existingWalletId;
     if (raw != null) {
       final List<dynamic> decoded = jsonDecode(raw);
       all = decoded.map((e) => Budget.fromJson(e)).toList();
+      final prev = all.where((b) => b.categoryId == categoryId).firstOrNull;
+      if (prev != null) {
+        existingWalletId = prev.walletId;
+      }
     }
     all.removeWhere((b) => b.categoryId == categoryId);
     if (limit > 0) {
       all.add(Budget(
         id: _uuid.v4(),
         categoryId: categoryId,
+        walletId: walletId ?? existingWalletId,
         monthlyLimit: limit,
         month: m,
         year: y,
@@ -309,8 +315,9 @@ class StorageService {
         final allBudgets = getBudgets(now.month, now.year);
         final bIdx = allBudgets.indexWhere((b) => b.categoryId == item.categoryId);
         if (bIdx != -1) {
-          final newLimit = (allBudgets[bIdx].monthlyLimit - item.amount).clamp(0.0, double.infinity);
-          await setBudget(item.categoryId, newLimit, now.month, now.year);
+          final targetBudget = allBudgets[bIdx];
+          final newLimit = (targetBudget.monthlyLimit - item.amount).clamp(0.0, double.infinity);
+          await setBudget(item.categoryId, newLimit, now.month, now.year, targetBudget.walletId);
         }
       }
     } else if (item.type == 'income') {
@@ -424,8 +431,9 @@ class StorageService {
         final allBudgets = getBudgets(now.month, now.year);
         final bIdx = allBudgets.indexWhere((b) => b.categoryId == item.categoryId);
         if (bIdx != -1) {
-          final newLimit = allBudgets[bIdx].monthlyLimit + item.amount;
-          await setBudget(item.categoryId, newLimit, now.month, now.year);
+          final targetBudget = allBudgets[bIdx];
+          final newLimit = targetBudget.monthlyLimit + item.amount;
+          await setBudget(item.categoryId, newLimit, now.month, now.year, targetBudget.walletId);
         }
       }
     } else if (item.type == 'income') {

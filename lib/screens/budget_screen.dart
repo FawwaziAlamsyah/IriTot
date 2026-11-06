@@ -54,8 +54,17 @@ class _BudgetScreenState extends State<BudgetScreen> {
         .toList();
     final budgetMap = {for (var b in existingBudgets) b.categoryId: b.monthlyLimit};
     final totalCash = widget.storageService.getTotalBalance();
+    final wallets = widget.storageService.getWallets();
 
     CategoryItem selectedCategory = preselectedCategory ?? expenseCategories.first;
+    String selectedWalletId = existingBudgets
+            .where((b) => b.categoryId == selectedCategory.id)
+            .firstOrNull
+            ?.walletId ??
+        (wallets.isNotEmpty ? wallets.first.id : 'w_cash');
+    if (!wallets.any((w) => w.id == selectedWalletId) && wallets.isNotEmpty) {
+      selectedWalletId = wallets.first.id;
+    }
     final controller = TextEditingController();
 
     showDialog(
@@ -208,8 +217,15 @@ class _BudgetScreenState extends State<BudgetScreen> {
                             onChanged: (val) {
                               if (val != null) {
                                 final newCat = expenseCategories.firstWhere((c) => c.id == val);
+                                final existingBoundWallet = existingBudgets
+                                    .where((b) => b.categoryId == newCat.id)
+                                    .firstOrNull
+                                    ?.walletId;
                                 setDialogState(() {
                                   selectedCategory = newCat;
+                                  if (existingBoundWallet != null && wallets.any((w) => w.id == existingBoundWallet)) {
+                                    selectedWalletId = existingBoundWallet;
+                                  }
                                 });
                               }
                             },
@@ -218,6 +234,67 @@ class _BudgetScreenState extends State<BudgetScreen> {
                       ),
                       const SizedBox(height: 14),
                     ],
+
+                    // Pilihan Dompet Sumber Dana Anggaran
+                    Text(
+                      t('sourceWalletFunding'),
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surfaceLighter,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppTheme.borderDark),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: selectedWalletId,
+                          isExpanded: true,
+                          dropdownColor: AppTheme.surfaceDark,
+                          items: wallets.map((w) {
+                            final isZero = w.balance <= 0;
+                            return DropdownMenuItem(
+                              value: w.id,
+                              child: Row(
+                                children: [
+                                  Icon(Icons.account_balance_wallet_outlined, size: 14, color: isZero ? AppTheme.textMuted : AppTheme.emeraldGreen),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      w.name,
+                                      style: TextStyle(
+                                        color: isZero ? AppTheme.textMuted : AppTheme.textPrimary,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  Text(
+                                    _currencyFormat.format(w.balance),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: isZero ? AppTheme.coralRose : AppTheme.emeraldGreen,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) {
+                              setDialogState(() {
+                                selectedWalletId = val;
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
 
                     Text(t('enterAddAmount'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
                     const SizedBox(height: 6),
@@ -359,7 +436,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
 
                             final navigator = Navigator.of(dialogContext);
                             final updatedLimit = currentLimit + add;
-                            await widget.storageService.setBudget(selectedCategory.id, updatedLimit, now.month, now.year);
+                            await widget.storageService.setBudget(selectedCategory.id, updatedLimit, now.month, now.year, selectedWalletId);
                             if (mounted) {
                               setState(() {});
                               widget.onDataChanged();
@@ -694,6 +771,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
 
     final budgetMap = {for (var b in budgets) b.categoryId: b.monthlyLimit};
     final totalCash = widget.storageService.getTotalBalance();
+    final wallets = widget.storageService.getWallets();
 
     double totalBudget = 0.0;
     for (final c in categories) {
@@ -826,6 +904,10 @@ class _BudgetScreenState extends State<BudgetScreen> {
               itemBuilder: (context, index) {
                 final cat = categories[index];
                 final limit = budgetMap[cat.id] ?? 0.0;
+                final catBudget = budgets.where((b) => b.categoryId == cat.id).firstOrNull;
+                final fundingWallet = (catBudget?.walletId != null)
+                    ? wallets.where((w) => w.id == catBudget!.walletId).firstOrNull
+                    : null;
 
                 return Container(
                   padding: const EdgeInsets.all(14),
@@ -855,6 +937,28 @@ class _BudgetScreenState extends State<BudgetScreen> {
                                 cat.name,
                                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
                               ),
+                              if (fundingWallet != null && limit > 0) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.surfaceLighter,
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: AppTheme.borderDark),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.account_balance_wallet_outlined, size: 10, color: AppTheme.cyanAccent),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        fundingWallet.name,
+                                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppTheme.cyanAccent),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                           Text(

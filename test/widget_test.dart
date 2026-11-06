@@ -1004,4 +1004,160 @@ void main() {
     expect(updatedTxs[1].amount, 75000);
     expect(updatedTxs[1].date.day, yesterday.day);
   });
+
+  testWidgets('Option 3: Budget tagging with wallet and badge display in BudgetScreen', (WidgetTester tester) async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    SharedPreferences.setMockInitialValues({});
+
+    final storage = await StorageService.init();
+    final locale = await LocaleService.init();
+    await locale.setLocale('id');
+    final now = DateTime.now();
+
+    // 1. Setup 2 wallets: Dompet Utama and Bank BCA
+    final mainWallet = storage.getWallets().first;
+    mainWallet.balance = 500000;
+    final bcaWallet = Wallet(
+      id: 'w_bca',
+      name: 'Bank BCA',
+      type: 'bank',
+      balance: 100000,
+      icon: 'account_balance',
+      colorValue: 0xFF38BDF8,
+    );
+    await storage.saveWallets([mainWallet, bcaWallet]);
+
+    // 2. Set budget for cat_food funded from Bank BCA
+    await storage.setBudget('cat_food', 100000, now.month, now.year, 'w_bca');
+    final budgets = storage.getBudgets(now.month, now.year);
+    final foodBudget = budgets.firstWhere((b) => b.categoryId == 'cat_food');
+    expect(foodBudget.walletId, 'w_bca');
+
+    // 3. Render BudgetScreen and verify wallet badge on category card
+    await tester.pumpWidget(MaterialApp(
+      home: BudgetScreen(
+        storageService: storage,
+        localeService: locale,
+        onDataChanged: () {},
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    // The badge for Bank BCA should be visible in category list
+    expect(find.text('Bank BCA'), findsWidgets);
+  });
+
+  testWidgets('Option 3: AddTransactionModal auto-switches wallet on category selection, shows wallet balances in dropdown, and blocks empty wallet expense', (WidgetTester tester) async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    SharedPreferences.setMockInitialValues({});
+
+    final storage = await StorageService.init();
+    final locale = await LocaleService.init();
+    await locale.setLocale('id');
+    final ai = await AiService.init();
+    final now = DateTime.now();
+
+    // 1. Setup 2 wallets: Dompet Utama (balance 500.000) and Bank BCA (balance 0)
+    final mainWallet = storage.getWallets().first;
+    mainWallet.balance = 500000;
+    final bcaWallet = Wallet(
+      id: 'w_bca',
+      name: 'Bank BCA',
+      type: 'bank',
+      balance: 0,
+      icon: 'account_balance',
+      colorValue: 0xFF38BDF8,
+    );
+    await storage.saveWallets([mainWallet, bcaWallet]);
+
+    // 2. Set budget for cat_food with walletId 'w_cash' (Dompet Utama)
+    await storage.setBudget('cat_food', 200000, now.month, now.year, 'w_cash');
+
+    await tester.pumpWidget(MaterialApp(
+      home: Builder(
+        builder: (ctx) => Scaffold(
+          body: ElevatedButton(
+            onPressed: () {
+              showModalBottomSheet(
+                context: ctx,
+                isScrollControlled: true,
+                builder: (_) => AddTransactionModal(
+                  storageService: storage,
+                  aiService: ai,
+                  localeService: locale,
+                  initialWalletId: 'w_bca',
+                  onTransactionAdded: () {},
+                ),
+              );
+            },
+            child: const Text('Open Modal'),
+          ),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Open Modal'));
+    await tester.pumpAndSettle();
+
+    // 3. Verify dropdown shows empty wallet indicator 'Rp 0 (Kosong)'
+    expect(find.textContaining('Rp 0 (Kosong)'), findsWidgets);
+
+    // 4. Tap cat_food (Makan & Minum): should auto-switch wallet to 'w_cash' (Dompet Utama)
+    final foodCatFinder = find.text('Makan & Minum');
+    expect(foodCatFinder, findsWidgets);
+    await tester.ensureVisible(foodCatFinder.first);
+    await tester.tap(foodCatFinder.first);
+    await tester.pumpAndSettle();
+
+    // Enter amount 50000
+    await tester.enterText(find.byType(TextField).first, '50000');
+    await tester.pumpAndSettle();
+
+    // 5. Now switch manually back to Bank BCA (which has Rp 0) to verify strict block
+    await tester.tap(find.byType(DropdownButton<String>).first);
+    await tester.pumpAndSettle();
+
+    // Select Bank BCA from dropdown items
+    await tester.tap(find.text('Bank BCA').last);
+    await tester.pumpAndSettle();
+
+    // Attempt to save expense 50.000 with Bank BCA (balance = 0)
+    await tester.ensureVisible(find.text('Simpan Pengeluaran'));
+    await tester.tap(find.text('Simpan Pengeluaran'));
+    await tester.pumpAndSettle();
+
+    // Verify pop alert dialog appears with insufficient wallet balance message
+    expect(find.textContaining('Saldo dompet tidak mencukupi (Bank BCA: Rp 0)'), findsOneWidget);
+    expect(find.textContaining('Silakan gunakan dompet lain atau isi saldo terlebih dahulu'), findsOneWidget);
+
+    // Dismiss alert dialog
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+
+    // Verify transaction was NOT recorded and BCA balance is still 0 (not negative)
+    expect(storage.getTransactions().isEmpty, isTrue);
+    final bcaAfter = storage.getWallets().firstWhere((w) => w.id == 'w_bca');
+    expect(bcaAfter.balance, 0);
+
+    // 6. Switch back to Dompet Utama and save
+    await tester.tap(find.byType(DropdownButton<String>).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Dompet Utama').last);
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Simpan Pengeluaran'));
+    await tester.tap(find.text('Simpan Pengeluaran'));
+    await tester.pumpAndSettle();
+
+    // Verify transaction succeeded with Dompet Utama
+    final txs = storage.getTransactions();
+    expect(txs.length, 1);
+    expect(txs.first.walletId, 'w_cash');
+    expect(txs.first.amount, 50000);
+
+    // Dompet Utama balance reduced to 450.000
+    final mainAfter = storage.getWallets().firstWhere((w) => w.id == 'w_cash');
+    expect(mainAfter.balance, 450000);
+  });
 }
