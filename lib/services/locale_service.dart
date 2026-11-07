@@ -280,6 +280,9 @@ class LocaleService extends ChangeNotifier {
 
       // Home Screen
       'totalCashBalance': 'TOTAL CASH BALANCE',
+      'mainBalance': 'MAIN BALANCE',
+      'totalCashInfo': 'Total Cash',
+      'inPocketInfo': 'In Pocket',
       'hide': 'Hide',
       'show': 'Show',
       'income': 'Income',
@@ -698,6 +701,9 @@ class LocaleService extends ChangeNotifier {
 
       // Home Screen
       'totalCashBalance': 'TOTAL SALDO KAS',
+      'mainBalance': 'SALDO UTAMA',
+      'totalCashInfo': 'Total Kas',
+      'inPocketInfo': 'Di Pocket',
       'hide': 'Sembunyikan',
       'show': 'Tampilkan',
       'income': 'Pemasukan',

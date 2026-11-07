@@ -18,6 +18,7 @@ import 'package:iritot/screens/savings_screen.dart';
 import 'package:iritot/screens/pocket_history_screen.dart';
 import 'package:iritot/screens/budget_screen.dart';
 import 'package:iritot/screens/settings_screen.dart';
+import 'package:iritot/screens/home_screen.dart';
 import 'package:iritot/screens/add_transaction_modal.dart';
 
 void main() {
@@ -53,7 +54,8 @@ void main() {
     expect(find.text('PERSONAL'), findsOneWidget);
     expect(find.text('Spending'), findsOneWidget);
     expect(find.text('Monthly Budget'), findsOneWidget);
-    expect(find.text('TOTAL CASH BALANCE'), findsOneWidget);
+    expect(find.text('MAIN BALANCE'), findsOneWidget);
+    expect(find.textContaining('Total Cash:'), findsOneWidget);
     expect(find.text('Monthly'), findsOneWidget);
     expect(find.text('SAVINGS & POCKETS'), findsNothing);
 
@@ -1342,5 +1344,69 @@ void main() {
     final foodB = savedBudgets.firstWhere((b) => b.categoryId == 'cat_food');
     expect(foodB.monthlyLimit, 225000);
     expect(foodB.walletId, 'w_bca');
+  });
+
+  testWidgets('Home Screen differentiates Main Balance and Total Cash Balance with Pocket breakdown', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final storage = await StorageService.init();
+    final auth = await AuthService.init();
+    final locale = await LocaleService.init();
+    final ai = await AiService.init();
+
+    // Set wallets: Tunai = 300.000, Bank BCA = 200.000 -> Total Wallet (Main Balance) = 500.000
+    await storage.saveWallets([
+      Wallet(id: 'w_cash', name: 'Tunai', type: 'cash', balance: 300000, icon: 'account_balance_wallet', colorValue: 0xFF10B981),
+      Wallet(id: 'w_bca', name: 'Bank BCA', type: 'bank', balance: 200000, icon: 'account_balance', colorValue: 0xFF3B82F6),
+    ]);
+
+    // Set a savings pocket with 150.000
+    await storage.saveSavingsPockets([
+      SavingsPocket(
+        id: 'sp_vacation',
+        name: 'Liburan Bali',
+        targetAmount: 1000000,
+        currentAmount: 150000,
+        icon: 'beach_access',
+        colorValue: 0xFF06B6D4,
+        createdAt: DateTime.now(),
+      ),
+    ]);
+
+    // Total savings = 150.000
+    // Main balance = 500.000
+    // Total cash balance = 650.000
+
+    await tester.pumpWidget(MaterialApp(
+      home: HomeScreen(
+        storageService: storage,
+        authService: auth,
+        localeService: locale,
+        aiService: ai,
+        onNavigateToTab: (_) {},
+        onOpenAiAssistant: () {},
+        onDataChanged: () {},
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    // 1. Verify MAIN BALANCE label is displayed
+    expect(find.text('MAIN BALANCE'), findsOneWidget);
+
+    // 2. Verify Main Balance displays Rp 500.000 (focused primary balance)
+    expect(find.text('Rp 500.000'), findsOneWidget);
+
+    // 3. Verify Total Cash info pill displays Total Cash: Rp 650.000
+    expect(find.text('Total Cash: Rp 650.000'), findsOneWidget);
+
+    // 4. Verify In Pocket badge displays In Pocket: Rp 150.000
+    expect(find.text('In Pocket: Rp 150.000'), findsOneWidget);
+
+    // 5. Test privacy toggle (hide balances)
+    await tester.tap(find.byTooltip('Balance Privacy'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Rp ••••••••'), findsOneWidget); // Main balance hidden
+    expect(find.text('Total Cash: Rp ••••••'), findsOneWidget); // Total cash hidden
+    expect(find.text('In Pocket: Rp •••'), findsOneWidget); // Pocket hidden
   });
 }

@@ -331,6 +331,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final totalBalance = widget.storageService.getTotalBalance();
+    final totalSavings = widget.storageService.getTotalSavingsBalance();
+    final totalCashBalance = totalBalance + totalSavings;
     final monthlyIncome = widget.storageService.getMonthlyIncome(now.month, now.year);
     final monthlyExpense = widget.storageService.getMonthlyExpense(now.month, now.year);
     final wallets = widget.storageService.getWallets();
@@ -534,7 +536,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   // Page 1: Spending (Pemakaian Sehari-hari)
                   _buildDailySpendingPage(
                     now: now,
-                    totalBalance: totalBalance,
+                    mainBalance: totalBalance,
+                    totalCashBalance: totalCashBalance,
+                    totalSavings: totalSavings,
                     monthlyIncome: monthlyIncome,
                     monthlyExpense: monthlyExpense,
                     wallets: wallets,
@@ -564,7 +568,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   Widget _buildDailySpendingPage({
     required DateTime now,
-    required double totalBalance,
+    required double mainBalance,
+    required double totalCashBalance,
+    required double totalSavings,
     required double monthlyIncome,
     required double monthlyExpense,
     required List<Wallet> wallets,
@@ -630,16 +636,31 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Top Info Row: Total Cash Balance Pill & Period Range
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      widget.localeService?.t('totalCashBalance') ?? 'TOTAL CASH BALANCE',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
-                        color: AppTheme.textMuted,
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surfaceLighter.withValues(alpha: 0.7),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppTheme.borderDark.withValues(alpha: 0.7)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.account_balance_wallet_outlined, size: 12, color: AppTheme.cyanAccent),
+                          const SizedBox(width: 5),
+                          Text(
+                            '${widget.localeService?.t('totalCashInfo') ?? 'Total Kas'}: ${_isBalanceHidden ? 'Rp ••••••' : _currencyFormat.format(totalCashBalance)}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     Text(
@@ -652,9 +673,44 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
+                // Main Balance (Focused Label & In-Pocket Info)
+                Row(
+                  children: [
+                    Text(
+                      widget.localeService?.t('mainBalance') ?? 'SALDO UTAMA',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.8,
+                        color: AppTheme.textMuted,
+                      ),
+                    ),
+                    if (totalSavings > 0) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppTheme.cyanAccent.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: AppTheme.cyanAccent.withValues(alpha: 0.25)),
+                        ),
+                        child: Text(
+                          '${widget.localeService?.t('inPocketInfo') ?? 'Di Pocket'}: ${_isBalanceHidden ? 'Rp •••' : _currencyFormat.format(totalSavings)}',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.cyanAccent,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 6),
+                // Main Balance Big Value Focus
                 Text(
-                  _isBalanceHidden ? 'Rp ••••••••' : _currencyFormat.format(totalBalance),
+                  _isBalanceHidden ? 'Rp ••••••••' : _currencyFormat.format(mainBalance),
                   style: const TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.w800,
