@@ -53,7 +53,6 @@ class _BudgetScreenState extends State<BudgetScreen> {
         .where((b) => expenseCatIds.contains(b.categoryId))
         .toList();
     final budgetMap = {for (var b in existingBudgets) b.categoryId: b.monthlyLimit};
-    final totalCash = widget.storageService.getTotalBalance();
     final wallets = widget.storageService.getWallets();
 
     CategoryItem selectedCategory = preselectedCategory ?? expenseCategories.first;
@@ -72,9 +71,19 @@ class _BudgetScreenState extends State<BudgetScreen> {
       builder: (dialogContext) {
         return StatefulBuilder(
           builder: (ctx, setDialogState) {
-            final totalMonthlyBudget = existingBudgets.fold(0.0, (sum, b) => sum + b.monthlyLimit);
-            final maxSafeBudget = (totalCash - totalMonthlyBudget).clamp(0.0, double.infinity);
+            final selectedWallet = wallets.firstWhere(
+              (w) => w.id == selectedWalletId,
+              orElse: () => wallets.first,
+            );
+            final isDefaultWallet = selectedWallet.id == (wallets.isNotEmpty ? wallets.first.id : 'w_cash');
+
+            final otherBudgetsFromThisWallet = existingBudgets
+                .where((b) => b.categoryId != selectedCategory.id &&
+                    (b.walletId == selectedWallet.id || (b.walletId == null && isDefaultWallet)))
+                .fold(0.0, (sum, b) => sum + b.monthlyLimit);
+
             final currentLimit = budgetMap[selectedCategory.id] ?? 0.0;
+            final maxSafeBudget = (selectedWallet.balance - otherBudgetsFromThisWallet - currentLimit).clamp(0.0, double.infinity);
             final addAmount = ThousandsSeparatorInputFormatter.parse(controller.text);
             final isOverCash = addAmount > maxSafeBudget;
             final previewLimit = currentLimit + addAmount;
@@ -111,7 +120,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Referensi Total Kas dan Dompet
+                    // Referensi Saldo Dompet Sumber dan Alokasi
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -129,17 +138,21 @@ class _BudgetScreenState extends State<BudgetScreen> {
                             children: [
                               Row(
                                 children: [
-                                  const Icon(Icons.account_balance_wallet_outlined, size: 14, color: AppTheme.textSecondary),
+                                  const Icon(Icons.account_balance_wallet_outlined, size: 14, color: AppTheme.cyanAccent),
                                   const SizedBox(width: 6),
                                   Text(
-                                    t('walletCashReference'),
+                                    '${t('walletBalanceFunding')} (${selectedWallet.name}):',
                                     style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
                                   ),
                                 ],
                               ),
                               Text(
-                                _currencyFormat.format(totalCash),
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.emeraldGreen),
+                                _currencyFormat.format(selectedWallet.balance),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: selectedWallet.balance > 0 ? AppTheme.emeraldGreen : AppTheme.coralRose,
+                                ),
                               ),
                             ],
                           ),
@@ -331,7 +344,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
-                              '${t('errBudgetExceedsCash')} (${widget.localeService?.isIndonesian == true ? 'Maks' : 'Max'}: ${_currencyFormat.format(maxSafeBudget)})',
+                              '${t('errBudgetExceedsWallet')} (${selectedWallet.name} ${widget.localeService?.isIndonesian == true ? 'Maks' : 'Max'}: ${_currencyFormat.format(maxSafeBudget)})',
                               style: const TextStyle(fontSize: 11, color: AppTheme.coralRose, fontWeight: FontWeight.w600),
                             ),
                           ),
@@ -422,11 +435,11 @@ class _BudgetScreenState extends State<BudgetScreen> {
                           onPressed: () async {
                             final add = ThousandsSeparatorInputFormatter.parse(controller.text);
                             if (add <= 0) return;
-                            if (add > maxSafeBudget && totalCash > 0) {
+                            if (add > maxSafeBudget) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(
-                                    '${t('errBudgetExceedsCash')} (${widget.localeService?.isIndonesian == true ? 'Maks' : 'Max'}: ${_currencyFormat.format(maxSafeBudget)})',
+                                    '${t('errBudgetExceedsWallet')} (${selectedWallet.name} ${widget.localeService?.isIndonesian == true ? 'Maks' : 'Max'}: ${_currencyFormat.format(maxSafeBudget)})',
                                   ),
                                   backgroundColor: AppTheme.coralRose,
                                 ),

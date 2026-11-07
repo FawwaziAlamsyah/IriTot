@@ -3,12 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../models/savings_pocket.dart';
-import '../models/savings_record.dart';
 import '../services/storage_service.dart';
 import '../services/csv_service.dart';
 import '../services/file_io_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/currency_input_formatter.dart';
+import 'pocket_history_screen.dart';
 
 import '../services/locale_service.dart';
 
@@ -35,8 +35,6 @@ class SavingsScreen extends StatefulWidget {
 class _SavingsScreenState extends State<SavingsScreen> {
   bool _isBalanceHidden = false;
   bool get _effectiveBalanceHidden => widget.isBalanceHidden ?? _isBalanceHidden;
-  String _historyFilter = 'all'; // 'all', 'in', 'out'
-  DateTime? _historyMonth; // null = all months
 
   final NumberFormat _currencyFormat = NumberFormat.currency(
     locale: 'id_ID',
@@ -45,6 +43,23 @@ class _SavingsScreenState extends State<SavingsScreen> {
   );
 
   String t(String key) => widget.localeService?.t(key) ?? key;
+
+  void _openPocketHistory() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PocketHistoryScreen(
+          storageService: widget.storageService,
+          localeService: widget.localeService,
+        ),
+      ),
+    ).then((_) {
+      if (mounted) {
+        setState(() {});
+        widget.onDataChanged();
+      }
+    });
+  }
 
   void _confirmDeletePocket(SavingsPocket p) {
     showDialog(
@@ -1271,162 +1286,6 @@ class _SavingsScreenState extends State<SavingsScreen> {
     );
   }
 
-  void _showRecordDetailModal(SavingsRecord r) {
-    final isIndo = widget.localeService?.isIndonesian == true;
-    final isTransfer = r.isPocketTransfer;
-    final isIn = r.isIn;
-    final Color accentColor = isTransfer
-        ? AppTheme.cyanAccent
-        : (isIn ? AppTheme.emeraldGreen : AppTheme.coralRose);
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: AppTheme.surfaceDark,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-            border: Border(top: BorderSide(color: AppTheme.borderDark, width: 1)),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppTheme.textMuted.withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    isIndo ? 'Detail Mutasi Tabungan' : 'Pocket Transaction Details',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: accentColor.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      isTransfer
-                          ? (isIndo ? 'Antar Pos' : 'Pocket Transfer')
-                          : (isIn ? (isIndo ? 'Setoran Dompet' : 'Wallet Deposit') : (isIndo ? 'Tarik Dompet' : 'Wallet Withdraw')),
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: accentColor),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              // Nominal Banner
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                decoration: BoxDecoration(
-                  color: AppTheme.surfaceLighter,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppTheme.borderDark),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      isIndo ? 'Nominal Transaksi' : 'Transaction Amount',
-                      style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      isIn ? '+${_currencyFormat.format(r.amount)}' : '-${_currencyFormat.format(r.amount)}',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        color: accentColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              _buildDetailRow(
-                isIndo ? 'Pos Kantong Tabungan' : 'Savings Pocket',
-                r.pocketName,
-                Icons.savings_outlined,
-              ),
-              const SizedBox(height: 10),
-              _buildDetailRow(
-                isTransfer
-                    ? (isIndo ? 'Pos Lawan (Tujuan/Asal)' : 'Counter Pocket')
-                    : (isIn ? (isIndo ? 'Dari Dompet Kas' : 'From Wallet') : (isIndo ? 'Pindah ke Dompet' : 'To Wallet')),
-                r.walletName,
-                isTransfer ? Icons.swap_horiz_rounded : Icons.account_balance_wallet_outlined,
-              ),
-              const SizedBox(height: 10),
-              _buildDetailRow(
-                isIndo ? 'Waktu Transaksi' : 'Date & Time',
-                DateFormat('EEEE, dd MMMM yyyy - HH:mm', isIndo ? 'id_ID' : 'en_US').format(r.date),
-                Icons.calendar_today_outlined,
-              ),
-              const SizedBox(height: 10),
-              _buildDetailRow(
-                isIndo ? 'Catatan' : 'Notes',
-                r.note.isEmpty ? '-' : r.note,
-                Icons.notes_outlined,
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                height: 44,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.surfaceLighter,
-                    foregroundColor: AppTheme.textPrimary,
-                    side: const BorderSide(color: AppTheme.borderDark),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: Text(t('close'), style: const TextStyle(fontWeight: FontWeight.w700)),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildDetailRow(String label, String value, IconData icon) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 16, color: AppTheme.textMuted),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
   // Dialog Buat Kantong Tabungan Baru
   void _showCreatePocketDialog() {
     final nameCtrl = TextEditingController();
@@ -1593,27 +1452,6 @@ class _SavingsScreenState extends State<SavingsScreen> {
     final monthlyIn = widget.storageService.getMonthlySavingsIn(now.month, now.year);
     final monthlyOut = widget.storageService.getMonthlySavingsOut(now.month, now.year);
     final netGrowth = widget.storageService.getNetSavingsGrowth(now.month, now.year);
-
-    // Pocket history: newest first, optionally limited to one month
-    final sortedRecords = List<SavingsRecord>.from(records)..sort((a, b) => b.date.compareTo(a.date));
-    final availableMonths = <DateTime>[];
-    for (final r in sortedRecords) {
-      final m = DateTime(r.date.year, r.date.month);
-      if (!availableMonths.contains(m)) availableMonths.add(m);
-    }
-    if (_historyMonth != null && !availableMonths.contains(_historyMonth)) {
-      _historyMonth = null;
-    }
-
-    final filteredRecords = sortedRecords.where((r) {
-      if (_historyMonth != null &&
-          (r.date.year != _historyMonth!.year || r.date.month != _historyMonth!.month)) {
-        return false;
-      }
-      if (_historyFilter == 'in') return r.isIn;
-      if (_historyFilter == 'out') return r.isOut;
-      return true;
-    }).toList();
 
     final scrollContent = SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -2010,185 +1848,85 @@ class _SavingsScreenState extends State<SavingsScreen> {
                     );
                   },
                 ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 24),
 
-              // Seksi Riwayat Mutasi Tabungan
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    t('secSavingsHistory'),
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.5, color: AppTheme.textSecondary),
-                  ),
-                  Row(
-                    children: [
-                      _buildFilterChip('all', t('allFilter')),
-                      const SizedBox(width: 4),
-                      _buildFilterChip('in', t('inFilter')),
-                      const SizedBox(width: 4),
-                      _buildFilterChip('out', t('outFilter')),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              if (availableMonths.isNotEmpty)
-                SizedBox(
-                  height: 32,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    children: [
-                      _buildMonthChip(null, t('allMonths')),
-                      for (final m in availableMonths) ...[
-                        const SizedBox(width: 6),
-                        _buildMonthChip(
-                          m,
-                          DateFormat('MMM yyyy', widget.localeService?.isIndonesian == true ? 'id_ID' : 'en_US').format(m),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              const SizedBox(height: 10),
-
-              if (filteredRecords.isEmpty)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 24),
+              // Tombol Buka Halaman Riwayat Tabungan
+              InkWell(
+                onTap: _openPocketHistory,
+                borderRadius: BorderRadius.circular(18),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
                   decoration: BoxDecoration(
                     color: AppTheme.surfaceDark,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(18),
                     border: Border.all(color: AppTheme.borderDark),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.25),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  child: Center(
-                    child: Text(t('noSavingsHistory'), style: const TextStyle(fontSize: 12, color: AppTheme.textMuted)),
-                  ),
-                )
-              else
-                ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: filteredRecords.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 8),
-                  itemBuilder: (context, index) {
-                    final r = filteredRecords[index];
-                    final isIn = r.isIn;
-                    final isTransfer = r.isPocketTransfer;
-                    final Color accentColor = isTransfer
-                        ? AppTheme.cyanAccent
-                        : (isIn ? AppTheme.emeraldGreen : AppTheme.coralRose);
-                    final IconData iconData = isTransfer
-                        ? Icons.swap_horiz_rounded
-                        : (isIn ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded);
-                    final String badgeText = isTransfer
-                        ? (widget.localeService?.t('badgePocketTransfer') ?? 'Antar Pos')
-                        : (isIn
-                            ? (widget.localeService?.t('badgeWalletDeposit') ?? 'Setoran Dompet')
-                            : (widget.localeService?.t('badgeWalletWithdraw') ?? 'Tarik Dompet'));
-                    final String subtitleText = isTransfer
-                        ? '${r.pocketName} ⇄ ${r.walletName} • ${DateFormat('dd MMM yyyy', widget.localeService?.isIndonesian == true ? 'id_ID' : 'en_US').format(r.date)}'
-                        : '${r.pocketName} • ${isIn ? (widget.localeService?.isIndonesian == true ? 'Dari' : 'From') : (widget.localeService?.isIndonesian == true ? 'Ke' : 'To')}: ${r.walletName} • ${DateFormat('dd MMM yyyy', widget.localeService?.isIndonesian == true ? 'id_ID' : 'en_US').format(r.date)}';
-
-                    return InkWell(
-                      onTap: () => _showRecordDetailModal(r),
-                      borderRadius: BorderRadius.circular(14),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
                         decoration: BoxDecoration(
-                          color: AppTheme.surfaceDark,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: isTransfer
-                                ? AppTheme.cyanAccent.withValues(alpha: 0.25)
-                                : AppTheme.borderDark,
-                          ),
+                          color: AppTheme.cyanAccent.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppTheme.cyanAccent.withValues(alpha: 0.3)),
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        child: const Icon(Icons.history_rounded, color: AppTheme.cyanAccent, size: 22),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 36,
-                                    height: 36,
-                                    decoration: BoxDecoration(
-                                      color: accentColor.withValues(alpha: 0.15),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Icon(
-                                      iconData,
-                                      color: accentColor,
-                                      size: 18,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                              decoration: BoxDecoration(
-                                                color: accentColor.withValues(alpha: 0.15),
-                                                borderRadius: BorderRadius.circular(4),
-                                              ),
-                                              child: Text(
-                                                badgeText,
-                                                style: TextStyle(
-                                                  fontSize: 9,
-                                                  fontWeight: FontWeight.w700,
-                                                  color: accentColor,
-                                                ),
-                                              ),
-                                            ),
-                                            const SizedBox(width: 6),
-                                            Expanded(
-                                              child: Text(
-                                                r.note,
-                                                maxLines: 1,
-                                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 3),
-                                        Text(
-                                          subtitleText,
-                                          style: const TextStyle(fontSize: 10, color: AppTheme.textMuted),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 12),
                             Row(
-                              mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text(
-                                  isIn ? '+${_currencyFormat.format(r.amount)}' : '-${_currencyFormat.format(r.amount)}',
-                                  style: TextStyle(
-                                    fontSize: 13,
+                                  t('viewPocketHistoryBtn'),
+                                  style: const TextStyle(
+                                    fontSize: 14,
                                     fontWeight: FontWeight.w700,
-                                    color: isIn ? (isTransfer ? AppTheme.cyanAccent : AppTheme.emeraldGreen) : AppTheme.coralRose,
+                                    color: AppTheme.textPrimary,
                                   ),
                                 ),
-                                const SizedBox(width: 4),
-                                const Icon(Icons.chevron_right, size: 14, color: AppTheme.textMuted),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.cyanAccent.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: AppTheme.cyanAccent.withValues(alpha: 0.3)),
+                                  ),
+                                  child: Text(
+                                    '${records.length}',
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppTheme.cyanAccent,
+                                    ),
+                                  ),
+                                ),
                               ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              t('viewPocketHistorySubtitle'),
+                              style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
                             ),
                           ],
                         ),
                       ),
-                    );
-                  },
+                      const Icon(Icons.arrow_forward_ios_rounded, color: AppTheme.textMuted, size: 14),
+                    ],
+                  ),
                 ),
+              ),
               const SizedBox(height: 32),
             ],
           ),
@@ -2204,6 +1942,11 @@ class _SavingsScreenState extends State<SavingsScreen> {
               onPressed: () => setState(() => _isBalanceHidden = !_isBalanceHidden),
               icon: Icon(_effectiveBalanceHidden ? Icons.visibility_off : Icons.visibility, color: AppTheme.textSecondary, size: 20),
               tooltip: 'Balance Privacy',
+            ),
+            IconButton(
+              onPressed: _openPocketHistory,
+              icon: const Icon(Icons.history_rounded, color: AppTheme.cyanAccent, size: 20),
+              tooltip: t('pocketHistoryTitle'),
             ),
             IconButton(
               onPressed: _showImportSavingsCsvDialog,
@@ -2466,54 +2209,6 @@ class _SavingsScreenState extends State<SavingsScreen> {
             ],
           );
         },
-      ),
-    );
-  }
-
-  Widget _buildMonthChip(DateTime? month, String label) {
-    final isSelected = _historyMonth == month;
-    return GestureDetector(
-      onTap: () => setState(() => _historyMonth = month),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? AppTheme.cyanAccent.withValues(alpha: 0.2) : AppTheme.surfaceLighter,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: isSelected ? AppTheme.cyanAccent : AppTheme.borderDark),
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-              color: isSelected ? AppTheme.cyanAccent : AppTheme.textSecondary,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFilterChip(String val, String label) {
-    final isSelected = _historyFilter == val;
-    return GestureDetector(
-      onTap: () => setState(() => _historyFilter = val),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-          color: isSelected ? AppTheme.emeraldGreen.withValues(alpha: 0.2) : AppTheme.surfaceLighter,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: isSelected ? AppTheme.emeraldGreen : AppTheme.borderDark),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-            color: isSelected ? AppTheme.emeraldGreen : AppTheme.textSecondary,
-          ),
-        ),
       ),
     );
   }

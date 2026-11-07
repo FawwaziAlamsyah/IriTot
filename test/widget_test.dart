@@ -8,12 +8,14 @@ import 'package:iritot/services/ai_service.dart';
 import 'package:iritot/services/auth_service.dart';
 import 'package:iritot/services/locale_service.dart';
 import 'package:iritot/models/savings_pocket.dart';
+import 'package:iritot/models/savings_record.dart';
 import 'package:iritot/models/wallet.dart';
 import 'package:iritot/models/budget.dart';
 import 'package:iritot/models/transaction_item.dart';
 import 'package:iritot/screens/splash_screen.dart';
 import 'package:iritot/screens/login_screen.dart';
 import 'package:iritot/screens/savings_screen.dart';
+import 'package:iritot/screens/pocket_history_screen.dart';
 import 'package:iritot/screens/budget_screen.dart';
 import 'package:iritot/screens/settings_screen.dart';
 import 'package:iritot/screens/add_transaction_modal.dart';
@@ -1159,5 +1161,186 @@ void main() {
     // Dompet Utama balance reduced to 450.000
     final mainAfter = storage.getWallets().firstWhere((w) => w.id == 'w_cash');
     expect(mainAfter.balance, 450000);
+  });
+
+  testWidgets('SavingsScreen renders dedicated button for pocket history and navigates to PocketHistoryScreen', (WidgetTester tester) async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    await initializeDateFormatting('en_US', null);
+    await initializeDateFormatting('id_ID', null);
+    SharedPreferences.setMockInitialValues({});
+
+    final storage = await StorageService.init();
+    final locale = await LocaleService.init();
+    await locale.setLocale('id');
+
+    // 1. Create a pocket and some mutation records
+    final pocket = SavingsPocket(
+      id: 'p_dana_darurat',
+      name: 'Dana Darurat',
+      targetAmount: 10000000,
+      currentAmount: 2000000,
+      colorValue: 0xFF10B981,
+      icon: 'savings',
+      createdAt: DateTime.now(),
+    );
+    await storage.addSavingsPocket(pocket);
+
+    await storage.saveSavingsRecords([
+      SavingsRecord(
+        id: 'rec_1',
+        pocketId: 'p_dana_darurat',
+        pocketName: 'Dana Darurat',
+        walletId: 'w_cash',
+        walletName: 'Dompet Utama',
+        amount: 500000,
+        type: 'deposit',
+        date: DateTime.now(),
+        note: 'Setor awal bulan',
+      ),
+      SavingsRecord(
+        id: 'rec_2',
+        pocketId: 'p_dana_darurat',
+        pocketName: 'Dana Darurat',
+        walletId: 'w_cash',
+        walletName: 'Dompet Utama',
+        amount: 100000,
+        type: 'withdraw',
+        date: DateTime.now(),
+        note: 'Tarik kebutuhan darurat',
+      ),
+    ]);
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SavingsScreen(
+          storageService: storage,
+          localeService: locale,
+          onDataChanged: () {},
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    // 2. Verify "Lihat Riwayat Tabungan" button is rendered on SavingsScreen
+    final historyBtnFinder = find.text('Lihat Riwayat Tabungan');
+    expect(historyBtnFinder, findsOneWidget);
+    expect(find.text('2'), findsWidgets);
+
+    // 3. Scroll and tap "Lihat Riwayat Tabungan"
+    await tester.ensureVisible(historyBtnFinder);
+    await tester.tap(historyBtnFinder);
+    await tester.pumpAndSettle();
+
+    // 4. Verify PocketHistoryScreen is displayed
+    expect(find.byType(PocketHistoryScreen), findsOneWidget);
+    expect(find.text('Riwayat Tabungan'), findsOneWidget);
+    expect(find.text('TOTAL MUTASI'), findsOneWidget);
+    expect(find.text('Setor awal bulan'), findsOneWidget);
+    expect(find.text('Tarik kebutuhan darurat'), findsOneWidget);
+
+    // 5. Tap on a record to open detail modal
+    await tester.tap(find.text('Setor awal bulan'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Detail Mutasi Tabungan'), findsOneWidget);
+    expect(find.text('Pos Kantong Tabungan'), findsOneWidget);
+
+    // Close detail modal
+    Navigator.of(tester.element(find.text('Detail Mutasi Tabungan'))).pop();
+    await tester.pumpAndSettle();
+
+    // 6. Tap back button to return to SavingsScreen
+    await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(PocketHistoryScreen), findsNothing);
+    expect(find.byType(SavingsScreen), findsOneWidget);
+  });
+
+  testWidgets('BudgetScreen ADD budget limit check depends strictly on selected funding wallet balance, not total cash', (WidgetTester tester) async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    SharedPreferences.setMockInitialValues({});
+
+    final storage = await StorageService.init();
+    final locale = await LocaleService.init();
+    await locale.setLocale('id');
+
+    // 1. Setup Dompet Utama = 1.500.000, Bank BCA = 225.000 (Total Cash = 1.725.000)
+    final mainWallet = storage.getWallets().first;
+    mainWallet.balance = 1500000;
+    final bcaWallet = Wallet(
+      id: 'w_bca',
+      name: 'Bank BCA',
+      type: 'bank',
+      balance: 225000,
+      icon: 'account_balance',
+      colorValue: 0xFF38BDF8,
+    );
+    await storage.saveWallets([mainWallet, bcaWallet]);
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: BudgetScreen(
+          storageService: storage,
+          localeService: locale,
+          onDataChanged: () {},
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    // 2. Tap ADD button on first category (Makan & Minum)
+    await tester.tap(find.text('ADD').first);
+    await tester.pumpAndSettle();
+
+    // Verify dialog opened
+    expect(find.textContaining('ADD: Makan & Minum'), findsOneWidget);
+
+    // Switch funding wallet dropdown to Bank BCA
+    await tester.tap(find.byType(DropdownButton<String>).last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Bank BCA').last);
+    await tester.pumpAndSettle();
+
+    // Verify reference card shows Bank BCA balance = Rp 225.000
+    expect(find.textContaining('Saldo Dompet Sumber (Bank BCA):'), findsOneWidget);
+    expect(find.text('Rp 225.000'), findsWidgets);
+
+    // 3. Enter 1.000.000 (which is less than total cash 1.725.000, but GREATER than Bank BCA 225.000)
+    await tester.enterText(find.byType(TextField).first, '1000000');
+    await tester.pumpAndSettle();
+
+    // Verify error warning appears
+    expect(find.textContaining('Nominal anggaran melebihi saldo dompet yang dipilih! (Bank BCA Maks: Rp 225.000)'), findsOneWidget);
+
+    // Tap Tambah: must be blocked by validation
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Tambah'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Nominal anggaran melebihi saldo dompet yang dipilih! (Bank BCA Maks: Rp 225.000)'), findsWidgets);
+    // Dialog should NOT be dismissed because save was blocked
+    expect(find.textContaining('ADD: Makan & Minum'), findsOneWidget);
+
+    // Let SnackBar dismiss
+    await tester.pump(const Duration(seconds: 4));
+
+    // 4. Change amount to safe limit: 225.000
+    await tester.enterText(find.byType(TextField).first, '225000');
+    await tester.pumpAndSettle();
+
+    // Error warning should disappear
+    expect(find.textContaining('Nominal anggaran melebihi saldo dompet yang dipilih!'), findsNothing);
+
+    // Tap Tambah: should succeed
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Tambah'));
+    await tester.pumpAndSettle();
+
+    // Dialog dismissed and budget saved
+    expect(find.textContaining('ADD: Makan & Minum'), findsNothing);
+    final now = DateTime.now();
+    final savedBudgets = storage.getBudgets(now.month, now.year);
+    final foodB = savedBudgets.firstWhere((b) => b.categoryId == 'cat_food');
+    expect(foodB.monthlyLimit, 225000);
+    expect(foodB.walletId, 'w_bca');
   });
 }
