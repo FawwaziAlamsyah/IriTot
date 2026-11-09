@@ -1398,8 +1398,9 @@ void main() {
     // 3. Verify Total Cash info pill displays Total Cash: Rp 650.000
     expect(find.text('Total Cash: Rp 650.000'), findsOneWidget);
 
-    // 4. Verify In Pocket badge displays In Pocket: Rp 150.000
-    expect(find.text('In Pocket: Rp 150.000'), findsOneWidget);
+    // 4. Verify Pocket balance badge is NOT shown on Home screen
+    expect(find.textContaining('In Pocket'), findsNothing);
+    expect(find.textContaining('Di Pocket'), findsNothing);
 
     // 5. Test privacy toggle (hide balances)
     await tester.tap(find.byTooltip('Balance Privacy'));
@@ -1407,6 +1408,6 @@ void main() {
 
     expect(find.text('Rp ••••••••'), findsOneWidget); // Main balance hidden
     expect(find.text('Total Cash: Rp ••••••'), findsOneWidget); // Total cash hidden
-    expect(find.text('In Pocket: Rp •••'), findsOneWidget); // Pocket hidden
+    expect(find.textContaining('In Pocket'), findsNothing);
   });
 }

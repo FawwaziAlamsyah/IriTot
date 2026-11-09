@@ -538,7 +538,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     now: now,
                     mainBalance: totalBalance,
                     totalCashBalance: totalCashBalance,
-                    totalSavings: totalSavings,
                     monthlyIncome: monthlyIncome,
                     monthlyExpense: monthlyExpense,
                     wallets: wallets,
@@ -570,7 +569,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     required DateTime now,
     required double mainBalance,
     required double totalCashBalance,
-    required double totalSavings,
     required double monthlyIncome,
     required double monthlyExpense,
     required List<Wallet> wallets,
@@ -674,38 +672,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   ],
                 ),
                 const SizedBox(height: 12),
-                // Main Balance (Focused Label & In-Pocket Info)
-                Row(
-                  children: [
-                    Text(
-                      widget.localeService?.t('mainBalance') ?? 'SALDO UTAMA',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
-                        color: AppTheme.textMuted,
-                      ),
-                    ),
-                    if (totalSavings > 0) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppTheme.cyanAccent.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: AppTheme.cyanAccent.withValues(alpha: 0.25)),
-                        ),
-                        child: Text(
-                          '${widget.localeService?.t('inPocketInfo') ?? 'Di Pocket'}: ${_isBalanceHidden ? 'Rp •••' : _currencyFormat.format(totalSavings)}',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.cyanAccent,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
+                // Main Balance (Focused Label)
+                Text(
+                  widget.localeService?.t('mainBalance') ?? 'SALDO UTAMA',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.8,
+                    color: AppTheme.textMuted,
+                  ),
                 ),
                 const SizedBox(height: 6),
                 // Main Balance Big Value Focus
