@@ -1353,28 +1353,34 @@ void main() {
     final locale = await LocaleService.init();
     final ai = await AiService.init();
 
-    // Set wallets: Tunai = 300.000, Bank BCA = 200.000 -> Total Wallet (Main Balance) = 500.000
+    // Set wallets: Tunai = 300.000, Bank BCA = 200.000 -> Total Wallet Cash = 500.000
     await storage.saveWallets([
       Wallet(id: 'w_cash', name: 'Tunai', type: 'cash', balance: 300000, icon: 'account_balance_wallet', colorValue: 0xFF10B981),
       Wallet(id: 'w_bca', name: 'Bank BCA', type: 'bank', balance: 200000, icon: 'account_balance', colorValue: 0xFF3B82F6),
     ]);
 
-    // Set a savings pocket with 150.000
+    // Set a monthly budget of 100.000 for cat_food
+    final now = DateTime.now();
+    await storage.setBudget('cat_food', 100000, now.month, now.year, 'w_cash');
+
+    // Set a secret savings pocket with 77.000 (must NEVER leak into Home Screen)
     await storage.saveSavingsPockets([
       SavingsPocket(
         id: 'sp_vacation',
         name: 'Liburan Bali',
         targetAmount: 1000000,
-        currentAmount: 150000,
+        currentAmount: 77000,
         icon: 'beach_access',
         colorValue: 0xFF06B6D4,
         createdAt: DateTime.now(),
       ),
     ]);
 
-    // Total savings = 150.000
-    // Main balance = 500.000
-    // Total cash balance = 650.000
+    // Total Wallet Cash = 500.000
+    // Total Monthly Budget = 100.000
+    // Main Balance (Cash not in monthly budget) = 400.000
+    // Total Balance = Main Balance (400.000) + Monthly Budget (100.000) = 500.000
+    // Secret Pocket (77.000) is NEVER shown or added on Home Screen
 
     await tester.pumpWidget(MaterialApp(
       home: HomeScreen(
@@ -1392,22 +1398,28 @@ void main() {
     // 1. Verify MAIN BALANCE label is displayed
     expect(find.text('MAIN BALANCE'), findsOneWidget);
 
-    // 2. Verify Main Balance displays Rp 500.000 (focused primary balance)
-    expect(find.text('Rp 500.000'), findsOneWidget);
+    // 2. Verify Main Balance displays Rp 400.000 (cash not in monthly budget: 500k - 100k)
+    expect(find.text('Rp 400.000'), findsOneWidget);
 
-    // 3. Verify Total Cash info pill displays Total Cash: Rp 650.000
-    expect(find.text('Total Cash: Rp 650.000'), findsOneWidget);
+    // 3. Verify Total Cash info pill displays Total Cash: Rp 500.000 (Main Balance 400k + Budget 100k)
+    expect(find.text('Total Cash: Rp 500.000'), findsOneWidget);
 
-    // 4. Verify Pocket balance badge is NOT shown on Home screen
+    // 4. Verify In Budget info tag displays In Budget: Rp 100.000
+    expect(find.text('In Budget: Rp 100.000'), findsOneWidget);
+
+    // 5. Verify Pocket is NEVER shown anywhere on the Home screen
     expect(find.textContaining('In Pocket'), findsNothing);
     expect(find.textContaining('Di Pocket'), findsNothing);
+    expect(find.textContaining('77.000'), findsNothing);
+    expect(find.textContaining('Liburan Bali'), findsNothing);
 
-    // 5. Test privacy toggle (hide balances)
+    // 6. Test privacy toggle (hide balances)
     await tester.tap(find.byTooltip('Balance Privacy'));
     await tester.pumpAndSettle();
 
     expect(find.text('Rp ••••••••'), findsOneWidget); // Main balance hidden
     expect(find.text('Total Cash: Rp ••••••'), findsOneWidget); // Total cash hidden
+    expect(find.text('In Budget: Rp •••'), findsOneWidget); // Budget hidden
     expect(find.textContaining('In Pocket'), findsNothing);
   });
 }

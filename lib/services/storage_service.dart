@@ -233,6 +233,32 @@ class StorageService {
         .toList();
   }
 
+  bool _isSavingsCategory(CategoryItem c) {
+    if (c.id == 'cat_savings') return true;
+    final name = c.name.toLowerCase();
+    return name.contains('tabung') || name.contains('pocket') || name.contains('saving');
+  }
+
+  double getTotalMonthlyBudget([int? month, int? year]) {
+    final now = DateTime.now();
+    final m = month ?? now.month;
+    final y = year ?? now.year;
+    final expenseCatIds = getCategories()
+        .where((c) => c.type == 'expense' && !_isSavingsCategory(c))
+        .map((c) => c.id)
+        .toSet();
+    final existingBudgets = getBudgets(m, y)
+        .where((b) => expenseCatIds.contains(b.categoryId))
+        .toList();
+    return existingBudgets.fold(0.0, (sum, b) => sum + b.monthlyLimit);
+  }
+
+  double getMainBalance([int? month, int? year]) {
+    final totalCash = getTotalBalance();
+    final totalBudget = getTotalMonthlyBudget(month, year);
+    return (totalCash - totalBudget).clamp(0.0, double.infinity);
+  }
+
   Future<void> saveBudgets(List<Budget> list) async {
     final raw = jsonEncode(list.map((e) => e.toJson()).toList());
     await _prefs.setString(_keyBudgets, raw);

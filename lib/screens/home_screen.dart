@@ -331,8 +331,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final totalBalance = widget.storageService.getTotalBalance();
-    final totalSavings = widget.storageService.getTotalSavingsBalance();
-    final totalCashBalance = totalBalance + totalSavings;
+    final totalMonthlyBudget = widget.storageService.getTotalMonthlyBudget(now.month, now.year);
+    final mainBalance = (totalBalance - totalMonthlyBudget).clamp(0.0, double.infinity);
     final monthlyIncome = widget.storageService.getMonthlyIncome(now.month, now.year);
     final monthlyExpense = widget.storageService.getMonthlyExpense(now.month, now.year);
     final wallets = widget.storageService.getWallets();
@@ -536,8 +536,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   // Page 1: Spending (Pemakaian Sehari-hari)
                   _buildDailySpendingPage(
                     now: now,
-                    mainBalance: totalBalance,
-                    totalCashBalance: totalCashBalance,
+                    mainBalance: mainBalance,
+                    totalBalance: totalBalance,
+                    totalMonthlyBudget: totalMonthlyBudget,
                     monthlyIncome: monthlyIncome,
                     monthlyExpense: monthlyExpense,
                     wallets: wallets,
@@ -568,7 +569,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Widget _buildDailySpendingPage({
     required DateTime now,
     required double mainBalance,
-    required double totalCashBalance,
+    required double totalBalance,
+    required double totalMonthlyBudget,
     required double monthlyIncome,
     required double monthlyExpense,
     required List<Wallet> wallets,
@@ -651,7 +653,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                           const Icon(Icons.account_balance_wallet_outlined, size: 12, color: AppTheme.cyanAccent),
                           const SizedBox(width: 5),
                           Text(
-                            '${widget.localeService?.t('totalCashInfo') ?? 'Total Kas'}: ${_isBalanceHidden ? 'Rp ••••••' : _currencyFormat.format(totalCashBalance)}',
+                            '${widget.localeService?.t('totalCashInfo') ?? 'Total Kas'}: ${_isBalanceHidden ? 'Rp ••••••' : _currencyFormat.format(totalBalance)}',
                             style: const TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
@@ -672,15 +674,38 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   ],
                 ),
                 const SizedBox(height: 12),
-                // Main Balance (Focused Label)
-                Text(
-                  widget.localeService?.t('mainBalance') ?? 'SALDO UTAMA',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.8,
-                    color: AppTheme.textMuted,
-                  ),
+                // Main Balance (Focused Label & Optional In-Budget Info)
+                Row(
+                  children: [
+                    Text(
+                      widget.localeService?.t('mainBalance') ?? 'SALDO UTAMA',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.8,
+                        color: AppTheme.textMuted,
+                      ),
+                    ),
+                    if (totalMonthlyBudget > 0) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppTheme.surfaceLighter.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: AppTheme.borderDark.withValues(alpha: 0.6)),
+                        ),
+                        child: Text(
+                          '${widget.localeService?.t('inBudgetInfo') ?? (widget.localeService?.isIndonesian == true ? 'Di Anggaran' : 'In Budget')}: ${_isBalanceHidden ? 'Rp •••' : _currencyFormat.format(totalMonthlyBudget)}',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.cyanAccent,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
                 const SizedBox(height: 6),
                 // Main Balance Big Value Focus
